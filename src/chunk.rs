@@ -43,12 +43,10 @@ impl Chunk {
         let locs_needed = 1 + (bytes_needed - 1) / self.min_alloc;
 
         if start_idx + bytes_needed >= self.data.capacity() {
-            println!("Not enough bytes");
             // Not enough room for the allocation
             return Err(())
         }
         if start_loc + locs_needed >= self.num_alloc_locs() {
-            println!("Not enough locs");
             // Another way of checking for the previous problem
             return Err(())
         }
