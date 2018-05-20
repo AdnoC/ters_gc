@@ -32,7 +32,7 @@ impl Chunk {
         self.used.borrow().none()
     }
 
-    pub fn alloc<T>(&self) -> Result<*mut T, ()> {
+    pub fn alloc_stacklike<T>(&self) -> Result<*mut T, ()> {
         let next_byte = self.alloc_to_idx(self.used.borrow().len());
 
         let start_idx = round_up(next_byte, max(mem::align_of::<T>(), self.min_alloc));
@@ -63,6 +63,43 @@ impl Chunk {
             starts_alloc.push(true);
             starts_alloc.grow(locs_needed - 1, false);
         }
+
+        let mut ptr = self.data.as_ptr();
+        ptr = unsafe { ptr.offset(start_idx as isize) };
+        Ok(ptr as *mut T)
+    }
+
+    pub fn alloc<T>(&self) -> Result<*mut T, ()> {
+        let next_byte = self.alloc_to_idx(self.used.borrow().len());
+
+        let start_idx = round_up(next_byte, max(mem::align_of::<T>(), self.min_alloc));
+        let start_loc = self.idx_to_alloc(start_idx);
+        // let loc_align = 1 + (mem::align_of::<T>() - 1) / self.min_alloc;
+
+        let bytes_needed = max(mem::size_of::<T>(), self.min_alloc);
+        let locs_needed = 1 + (bytes_needed - 1) / self.min_alloc;
+
+        if start_idx + bytes_needed >= self.data.capacity() {
+            // Not enough room for the allocation
+            return Err(())
+        }
+        if start_loc + locs_needed >= self.num_alloc_locs() {
+            // Another way of checking for the previous problem
+            return Err(())
+        }
+
+        // let padding_locs = start_loc - next_byte;
+        // {
+        //     let mut used = self.used.borrow_mut();
+        //     let mut starts_alloc = self.starts_alloc.borrow_mut();
+        //
+        //     used.grow(padding_locs, false);
+        //     starts_alloc.grow(padding_locs, false);
+        //
+        //     used.grow(locs_needed, true);
+        //     starts_alloc.push(true);
+        //     starts_alloc.grow(locs_needed - 1, false);
+        // }
 
         let ptr = self.data.as_ptr();
         Ok(ptr as *mut T)
