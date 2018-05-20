@@ -6,3 +6,4 @@ authors = ["AdnoC <adam.r.cutler@gmail.com>"]
 [dependencies]
 page_size = "0.4.1"
 bit-vec = "0.5.0"
+itertools = "0.7.6"

@@ -1,4 +1,5 @@
 use bit_vec::BitVec;
+use itertools::Itertools;
 
 use std::mem;
 use std::cmp::max;
@@ -70,39 +71,69 @@ impl Chunk {
     }
 
     pub fn alloc<T>(&self) -> Result<*mut T, ()> {
-        let next_byte = self.alloc_to_idx(self.used.borrow().len());
-
-        let start_idx = round_up(next_byte, max(mem::align_of::<T>(), self.min_alloc));
-        let start_loc = self.idx_to_alloc(start_idx);
+        // let next_byte = self.alloc_to_idx(self.used.borrow().len());
+        //
+        // let start_idx = round_up(next_byte, max(mem::align_of::<T>(), self.min_alloc));
+        // let start_loc = self.idx_to_alloc(start_idx);
         // let loc_align = 1 + (mem::align_of::<T>() - 1) / self.min_alloc;
 
-        let bytes_needed = max(mem::size_of::<T>(), self.min_alloc);
+        let bytes_needed = mem::size_of::<T>();
         let locs_needed = 1 + (bytes_needed - 1) / self.min_alloc;
 
-        if start_idx + bytes_needed >= self.data.capacity() {
+        let locs_per_step = 1 + (mem::align_of::<T>() - 1) / self.min_alloc;
+
+        println!("searching for storage loc");
+        let mut storage_loc_step = 0;
+        for contig_usage in &self.used.borrow().iter()
+            .chunks(locs_per_step) {
+                storage_loc_step += 1;
+                if contig_usage.take(locs_needed).all(|b| b) {
+                    storage_loc_step -= 1;
+                    break;
+                }
+        };
+
+
+        let storage_loc = storage_loc_step * locs_per_step;
+
+        if storage_loc + locs_needed >= self.num_alloc_locs() {
             // Not enough room for the allocation
             return Err(())
         }
-        if start_loc + locs_needed >= self.num_alloc_locs() {
-            // Another way of checking for the previous problem
-            return Err(())
+
+        if storage_loc + locs_needed > self.used.borrow().len() {
+            let mut used = self.used.borrow_mut();
+            let mut starts_alloc = self.starts_alloc.borrow_mut();
+            //
+            // if used.len() < storage_loc {
+            //     let padding_locs = storage_loc - used.len();
+            //     used.grow(padding_locs, false);
+            //     starts_alloc.grow(padding_locs, false);
+            // }
+            //
+            // let locs_to_add = storage_loc + locs_needed - used.len();
+            // used.grow(locs_to_add, true);
+            // starts_alloc.push(true);
+            // starts_alloc.grow(locs_to_add - 1, false);
+
+            let locs_to_add = storage_loc + locs_needed - used.len();
+            used.grow(locs_to_add, false);
+            starts_alloc.grow(locs_to_add, false);
         }
 
-        // let padding_locs = start_loc - next_byte;
-        // {
-        //     let mut used = self.used.borrow_mut();
-        //     let mut starts_alloc = self.starts_alloc.borrow_mut();
-        //
-        //     used.grow(padding_locs, false);
-        //     starts_alloc.grow(padding_locs, false);
-        //
-        //     used.grow(locs_needed, true);
-        //     starts_alloc.push(true);
-        //     starts_alloc.grow(locs_needed - 1, false);
-        // }
+        {
+            let mut used = self.used.borrow_mut();
+            let mut starts_alloc = self.starts_alloc.borrow_mut();
+
+            starts_alloc.set(storage_loc, true);
+
+            for i in storage_loc..(storage_loc + locs_needed) {
+                used.set(i, true);
+            }
+        }
 
         let ptr = self.data.as_ptr();
-        Ok(ptr as *mut T)
+        Ok(unsafe { ptr.offset(self.alloc_to_idx(storage_loc) as isize) } as *mut T)
     }
 
     pub fn dealloc<T>(&self, ptr: *const T) {

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+extern crate itertools;
 extern crate page_size;
 extern crate bit_vec;
 
