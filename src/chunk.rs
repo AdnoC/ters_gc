@@ -108,6 +108,7 @@ impl Chunk {
     pub fn dealloc<T>(&self, ptr: *const T) {
         assert!(!ptr.is_null());
         // TODO
+        unimplemented!();
     }
 
     pub fn contains<T>(&self, ptr: *const T) -> bool {
@@ -190,5 +191,14 @@ mod tests {
         assert!(!chunk_a.contains(before_a));
         let after_a = unsafe { data_a.offset(chunk_a.data.capacity() as isize) };
         assert!(!chunk_a.contains(after_a));
+    }
+
+    #[test]
+    fn is_empty_after_deallocating() {
+        let chunk = new_chunk();
+        let ptr = chunk.alloc::<Chunk>().unwrap();
+        assert!(!chunk.is_empty());
+        chunk.dealloc(ptr);
+        assert!(chunk.is_empty());
     }
 }
