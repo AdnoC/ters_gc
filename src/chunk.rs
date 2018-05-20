@@ -133,13 +133,36 @@ impl Chunk {
         }
 
         let ptr = self.data.as_ptr();
-        Ok(unsafe { ptr.offset(self.alloc_to_idx(storage_loc) as isize) } as *mut T)
+        Ok(unsafe { ptr.add(self.alloc_to_idx(storage_loc)) } as *mut T)
     }
 
     pub fn dealloc<T>(&self, ptr: *const T) {
         assert!(!ptr.is_null());
-        // TODO
-        unimplemented!();
+        assert!(self.contains(ptr));
+
+        let data_idx = ptr as usize - self.data.as_ptr() as usize;
+        let data_loc = self.idx_to_alloc(data_idx);
+
+        let mut used = self.used.borrow_mut();
+        let mut starts_alloc = self.starts_alloc.borrow_mut();
+
+        starts_alloc.set(data_loc, false);
+
+        let mut next_start_loc = data_loc;
+        for start_val in starts_alloc.iter().skip(data_loc) {
+            next_start_loc += 1;
+            if start_val {
+                break;
+            }
+        }
+
+        for i in data_loc..next_start_loc {
+            // Stop setting once we hit unused locs.
+            if !used.get(i).unwrap() {
+                break;
+            }
+            used.set(i, false);
+        }
     }
 
     pub fn contains<T>(&self, ptr: *const T) -> bool {
