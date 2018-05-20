@@ -65,9 +65,21 @@ impl Chunk {
         }
 
         let ptr = self.data.as_ptr();
-        unsafe {
-            Ok(ptr as *mut T)
-        }
+        Ok(ptr as *mut T)
+    }
+
+    pub fn dealloc<T>(&self, ptr: *const T) {
+        assert!(!ptr.is_null());
+        // TODO
+    }
+
+    pub fn contains<T>(&self, ptr: *const T) -> bool {
+        let data_start = self.data.as_ptr();
+        let data_end = unsafe { data_start.offset(self.data.capacity() as isize) } as usize;
+        let data_start = data_start as usize;
+        let ptr_val = ptr as usize;
+
+        ptr_val >= data_start && ptr_val < data_end
     }
 
     fn num_alloc_locs(&self) -> usize {
@@ -92,8 +104,12 @@ fn round_up(base: usize, align: usize) -> usize {
 mod tests {
     use page_size;
     use super::*;
+
+    const CHUNK_SIZE: usize = 1024;
+    const MIN_ALLOC: usize = 4;
+
     fn new_chunk() -> Chunk {
-        Chunk::with_size_and_min_alloc(1024, 4)
+        Chunk::with_size_and_min_alloc(CHUNK_SIZE, MIN_ALLOC)
     }
 
     #[test]
@@ -117,5 +133,25 @@ mod tests {
         assert!(chunk.is_empty());
         chunk.alloc::<Chunk>().unwrap();
         assert!(!chunk.is_empty());
+    }
+
+    #[test]
+    fn knows_what_addrs_it_contins() {
+        let chunk_a = new_chunk();
+        let in_a = chunk_a.alloc::<Chunk>().unwrap();
+        assert!(chunk_a.contains(in_a));
+
+        let chunk_b = new_chunk();
+        let in_b = chunk_b.alloc::<[u8; 5]>().unwrap();
+        assert!(chunk_b.contains(in_b));
+
+        assert!(!chunk_a.contains(in_b));
+        assert!(!chunk_b.contains(in_a));
+
+        let data_a = chunk_a.data.as_ptr();
+        let before_a = unsafe { data_a.offset(-1) };
+        assert!(!chunk_a.contains(before_a));
+        let after_a = unsafe { data_a.offset(chunk_a.data.capacity() as isize) };
+        assert!(!chunk_a.contains(after_a));
     }
 }
