@@ -31,7 +31,7 @@ mod type_erased_dropping {
 
             let mut a = false;
             {
-                let dt = DoThing {
+                let _dt = DoThing {
                     val: &mut a,
                 };
             }
