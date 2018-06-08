@@ -1,3 +1,10 @@
+// http://contain-rs.github.io/bit-vec/bit_vec/struct.BitVec.html
+// https://github.com/hsutter/gcpp/blob/master/gpage.h
+// https://github.com/hsutter/gcpp/blob/master/deferred_heap.h
+// https://github.com/pczarn/any-arena/blob/master/src/any_arena.rs
+// https://github.com/SimonSapin/rust-typed-arena/blob/master/src/lib.rs
+// https://github.com/Manishearth/rust-gc/tree/master/gc
+// https://doc.rust-lang.org/alloc/raw_vec/struct.RawVec.html
 use bit_vec::BitVec;
 use itertools::Itertools;
 

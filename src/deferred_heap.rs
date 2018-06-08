@@ -4,18 +4,20 @@ use std::cell::RefCell;
 
 use chunk::Chunk;
 
+// Storing/getting drop impl: https://doc.rust-lang.org/1.1.0/src/arena/lib.rs.html#187
+
 // longer_than_self lifetime from any_arena crate
 pub struct DeferredHeap<'longer_than_self> {
     chunks: RefCell<ChunkList>,
     _marker: PhantomData<*mut &'longer_than_self ()>,
 }
 
-impl<'longer_than_self> DeferredHeap<'longer_than_self> {
-    pub fn new() -> DeferredHeap<'longer_than_self> {
+impl<'a> DeferredHeap<'a> {
+    pub fn new() -> DeferredHeap<'a> {
         DeferredHeap::with_size(page_size::get())
     }
 
-    pub fn with_size(chunk_size: usize) -> DeferredHeap<'longer_than_self> {
+    pub fn with_size(chunk_size: usize) -> DeferredHeap<'a> {
         DeferredHeap {
             chunks: RefCell::new(ChunkList::with_size(chunk_size)),
             _marker: PhantomData,
