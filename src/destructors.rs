@@ -65,14 +65,16 @@ impl Destructors {
         let max_offset = range.len() as isize;
 
         for (idx, dtor) in self.dtors.iter().enumerate() {
-            let offset = unsafe { ptr.offset_from(dtor.ptr) };
+            let offset = unsafe { dtor.ptr.offset_from(ptr) };
+            println!("0..{}: {} ({})", max_offset, offset, idx);
             if offset >= 0 && offset < max_offset {
+                println!("\tDestroying");
                 to_destroy.push(idx);
                 (dtor.drop_glue)(dtor.ptr);
             }
         }
 
-        for idx in to_destroy.into_iter() {
+        for idx in to_destroy.into_iter().rev() {
             self.dtors.swap_remove(idx);
         }
     }
@@ -88,9 +90,28 @@ mod test {
         ops::RangeBounds,
     };
 
+    fn slice_t_as_slice_i8<'a, T>(slice: &'a [T]) -> &'a [i8] {
+        use std::mem::{
+            size_of,
+            transmute,
+        };
+        let vec = unsafe {
+            Vec::from_raw_parts(
+                slice.as_ptr() as *mut i8,
+                slice.len() * size_of::<T>(),
+                slice.len() * size_of::<T>(),
+                               )
+        };
+        let converted = unsafe { transmute(&vec[..]) };
+        forget(vec);
+        converted
+    }
+
     fn drain_forget<T, R>(vec: &mut Vec<T>, range: R) 
         where R: RangeBounds<usize> {
-        forget(vec.drain(range).last());
+        for val in vec.drain(range) {
+            forget(val);
+        }
     }
     fn drain_forget_at<T>(vec: &mut Vec<T>, idx: usize) {
         drain_forget(vec, idx..(idx + 1))
@@ -113,6 +134,7 @@ mod test {
         fn incr(&self) -> CounterIncrementer {
             CounterIncrementer {
                 counter: self.inner.clone(),
+                ran_dtor: false,
             }
         }
         fn incrs(&self, num: usize) -> Vec<CounterIncrementer> {
@@ -120,6 +142,7 @@ mod test {
             for _ in 0..num {
                 incrs.push(CounterIncrementer {
                     counter: self.inner.clone(),
+                    ran_dtor: false,
                 })
             }
             incrs
@@ -132,11 +155,16 @@ mod test {
     #[derive(Clone)]
     struct CounterIncrementer {
         counter: Rc<RefCell<DtorCounterInner>>,
+        ran_dtor: bool,
     }
     impl Drop for CounterIncrementer {
         fn drop(&mut self) {
+            if self.ran_dtor { return; }
+            self.ran_dtor = true;
+
             let mut counter_ref = self.counter.borrow_mut();
             counter_ref.num_run += 1;
+
         }
     }
 
@@ -201,21 +229,58 @@ mod test {
         assert_eq!(*first_dtor, Destructor { ptr, drop_glue });
 
         (first_dtor.drop_glue)(first_dtor.ptr);
+        drain_forget_at(&mut incr, 0);
         assert_eq!(counter.count(), 1);
 
-        drain_forget_at(&mut incr, 0);
     }
 
-    // #[test]
-    // fn runs_a_dtor() {
-    //     let mut dtors = Destructors::new();
-    //     let counter = DtorCounter::new();
-    //
-    //     let inrc = vec![counter.incr()];
-    //
-    //     dtors.store(&incr);
-    //
-    // }
+    #[test]
+    fn runs_a_dtor() {
+        let mut dtors = Destructors::new();
+        let counter = DtorCounter::new();
+
+        let mut incr = vec![counter.incr()];
+        dtors.store(&incr);
+
+        dtors.run(slice_t_as_slice_i8(&incr[..]));
+        drain_forget(&mut incr, ..);
+        assert_eq!(counter.count(), 1);
+    }
+    #[test]
+    fn runs_a_dtor_range() {
+        let mut dtors = Destructors::new();
+        let counter = DtorCounter::new();
+
+        const LEN_INCR: usize = 25;
+        let mut incr = vec![counter.incr(); LEN_INCR];
+        dtors.store(&incr);
+
+        dtors.run(slice_t_as_slice_i8(&incr[..]));
+        assert_eq!(counter.count(), LEN_INCR);
+        drain_forget(&mut incr, ..);
+        assert_eq!(counter.count(), LEN_INCR);
+    }
+
+    #[test]
+    fn runs_only_dtor_range() {
+        use std::ops::Range;
+        let mut dtors = Destructors::new();
+        let counter = DtorCounter::new();
+
+        const LEN_INCR: usize = 25;
+        const RANGE_TO_RUN: Range<usize> = 0..(LEN_INCR / 2);
+        const LEN_RANGE: usize = RANGE_TO_RUN.end - RANGE_TO_RUN.start;
+
+        let mut incr1 = vec![counter.incr(); LEN_INCR];
+        dtors.store(&incr1);
+
+        let mut incr2 = vec![counter.incr(); LEN_INCR];
+        dtors.store(&incr2);
+
+        dtors.run(slice_t_as_slice_i8(&incr1[RANGE_TO_RUN]));
+        drain_forget(&mut incr1, RANGE_TO_RUN);
+        assert_eq!(counter.count(), LEN_RANGE);
+    }
 
     // #[test]
     // fn runs_all_dtors() {
@@ -249,32 +314,36 @@ mod test {
         use std::mem::drop;
         let counter = DtorCounter::new();
         assert_eq!(0, counter.count());
+        const LEN_ANNON: usize = 25;
         {
-            let _ = vec![counter.incr(); 25];
+            let _ = vec![counter.incr(); LEN_ANNON];
         }
-        assert_eq!(25, counter.count());
-        let vec = vec![counter.incr(); 25];
-        assert_eq!(25, counter.count());
+        assert_eq!(LEN_ANNON, counter.count());
+
+        const LEN_VEC: usize = 25;
+        let vec = vec![counter.incr(); LEN_VEC];
+        assert_eq!(LEN_VEC, counter.count());
         drop(vec);
-        assert_eq!(50, counter.count());
+        assert_eq!(LEN_ANNON + LEN_VEC, counter.count());
 
     }
     #[test]
     fn sane_drain_forget() {
         let counter = DtorCounter::new();
 
-        let mut incr = vec![counter.incr(); 25];
+        const LEN_INCR: usize = 25;
+        let mut incr = vec![counter.incr(); LEN_INCR];
 
         let ptr = incr.first().unwrap() as *const _ as *const i8;
         let drop_glue = get_drop_glue::<CounterIncrementer>();
 
-        (first_dtor.drop_glue)(first_dtor.ptr);
+        drop_glue(ptr);
         assert_eq!(counter.count(), 1);
 
         drain_forget_at(&mut incr, 0);
-        assert_eq!(incr.len(), 24);
+        assert_eq!(incr.len(), LEN_INCR - 1);
         assert_eq!(counter.count(), 1);
         drop(incr);
-        assert_eq!(counter.count(), 25);
+        assert_eq!(counter.count(), LEN_INCR);
     }
 }
