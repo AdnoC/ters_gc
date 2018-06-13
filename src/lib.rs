@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-#![feature(core_intrinsics)]
+#![feature(core_intrinsics, ptr_offset_from)]
 
 extern crate itertools;
 extern crate page_size;
