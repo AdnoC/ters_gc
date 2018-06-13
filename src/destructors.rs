@@ -66,9 +66,7 @@ impl Destructors {
 
         for (idx, dtor) in self.dtors.iter().enumerate() {
             let offset = unsafe { dtor.ptr.offset_from(ptr) };
-            println!("0..{}: {} ({})", max_offset, offset, idx);
             if offset >= 0 && offset < max_offset {
-                println!("\tDestroying");
                 to_destroy.push(idx);
                 (dtor.drop_glue)(dtor.ptr);
             }
@@ -274,7 +272,7 @@ mod test {
         let mut incr1 = vec![counter.incr(); LEN_INCR];
         dtors.store(&incr1);
 
-        let mut incr2 = vec![counter.incr(); LEN_INCR];
+        let incr2 = vec![counter.incr(); LEN_INCR];
         dtors.store(&incr2);
 
         dtors.run(slice_t_as_slice_i8(&incr1[RANGE_TO_RUN]));
@@ -282,32 +280,32 @@ mod test {
         assert_eq!(counter.count(), LEN_RANGE);
     }
 
-    // #[test]
-    // fn runs_all_dtors() {
-    //     let mut dtors = Destructors::new();
-    //     let counter = DtorCounter::new();
-    //
-    //     let incrs1 = vec![counter.incr(); 25];
-    //     dtors.store(&incrs1);
-    //
-    //     let ints1 = vec![0; 25];
-    //     dtors.store(&incrs1);
-    //
-    //     let incrs2 = vec![counter.incr(); 25];
-    //     dtors.store(&incrs2);
-    //
-    //     let strings = vec!["Hello World".to_owned(); 25];
-    //     dtors.store(&strings);
-    //
-    //     
-    //     dtors.run_all();
-    //     assert_eq!(counter.count(), incrs1.len() + incrs2.len());
-    //
-    //     drain_forget(incrs1, ..);
-    //     drain_forget(incrs2, ..);
-    //     drain_forget(strings, ..);
-    //
-    // }
+    #[test]
+    fn runs_all_dtors() {
+        let mut dtors = Destructors::new();
+        let counter = DtorCounter::new();
+
+        let mut incrs1 = vec![counter.incr(); 25];
+        dtors.store(&incrs1);
+
+        let ints1 = vec![0; 25];
+        dtors.store(&ints1);
+
+        let mut incrs2 = vec![counter.incr(); 25];
+        dtors.store(&incrs2);
+
+        let mut strings = vec!["Hello World".to_owned(); 25];
+        dtors.store(&strings);
+
+
+        dtors.run_all();
+        assert_eq!(counter.count(), incrs1.len() + incrs2.len());
+
+        drain_forget(&mut incrs1, ..);
+        drain_forget(&mut incrs2, ..);
+        drain_forget(&mut strings, ..);
+
+    }
 
     #[test]
     fn dtor_counter_increments() {
