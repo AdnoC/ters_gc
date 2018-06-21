@@ -1,3 +1,77 @@
+// C garbage collector: https://github.com/orangeduck/tgc
+mod traverse_stack {
+    macro_rules! stack_ptr {
+        () => {
+            {
+                let a = ();
+                (&a) as *const ()
+            }
+        }
+    }
+    macro_rules! new_stack_loc {
+        () => {
+            StackLoc {
+                ptr: stack_ptr!(),
+            }
+        }
+    }
+    struct StackLoc {
+        ptr: *const (),
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        const MAGIC_NUM: i32 = 423987234;
+        #[test]
+        fn can_find_in_stack() {
+            let bottom = new_stack_loc!();
+            recerse_n_times(&bottom, 22);
+        }
+
+        #[inline(never)]
+        fn recerse_n_times(bottom: &StackLoc, times: i32) -> i32 {
+            if times == 0 {
+                probe_stack(bottom);
+                return 0;
+            }
+            let mut num = 0;
+            if times == 3 {
+                num = MAGIC_NUM;
+                return recerse_n_times(bottom, times - 1) + num;
+            }
+            return recerse_n_times(bottom, times - 1) + times;
+        }
+
+        #[inline(never)]
+        fn probe_stack(bottom: &StackLoc) {
+            let top = new_stack_loc!();
+
+            let start = round_up(top.ptr as usize, ::std::mem::align_of::<i32>());
+            let start = start as *const i32;
+            let end = bottom.ptr as *const i32;
+            let diff = end as usize - start as usize;
+            let steps = diff / ::std::mem::size_of::<i32>();
+            println!("diff = {}", diff);
+
+            let mut found = false;
+            for i in 0..steps {
+                let i = i as isize;
+                let ptr = unsafe {start.offset(i)};
+                let val = unsafe {*ptr};
+                if val == MAGIC_NUM {
+                    found = true;
+                }
+            }
+            assert!(found);
+        }
+
+        #[inline]
+        fn round_up(base: usize, align: usize) -> usize {
+            base.checked_add(align - 1).unwrap() & !(align - 1)
+        }
+    }
+}
 mod tracking_root_status {
     use std::marker::PhantomData;
 
@@ -116,7 +190,11 @@ mod tracking_root_status {
         fn deref(&self) -> &T {
             self.borrow()
         }
-
+    }
+    impl<'a, T: Traceable + 'a> Clone for Dp<'a, T> {
+        fn clone(&self) -> Dp<'a, T> {
+            unimplemented!()
+        }
     }
 
     #[derive(Eq, PartialEq)]
@@ -167,22 +245,36 @@ mod tracking_root_status {
             }
             let mut heap: DeferredHeap<LLNode> = DeferredHeap::new();
             let mut alloc = heap.allocator();
-            let mut node1: LLNode = Default::default();
+            let node1: LLNode = Default::default();
             let a: Dp<LLNode> = alloc.insert(Default::default()); 
             // a is root
-            let b: Dp<LLNode> = alloc.insert(Default::default());
-            let c: Dp<LLNode> = alloc.insert(Default::default());
-            let d: Dp<LLNode> = alloc.insert(Default::default());
 
             {
                 *node1.next.borrow_mut() = Some(a);
             }
-            {
-                {
-                    *b.next.borrow_mut() = Some(c);
-                }
-                *d.next.borrow_mut() = Some(b);
+        }
+        #[test]
+        fn linked_list_cycle() {
+            use ::std::cell::RefCell;
+            #[derive(Default)]
+            struct LLNode<'a> {
+                data: i32,
+                next: RefCell<Option<Dp<'a, LLNode<'a>>>>,
+                prev: RefCell<Option<Dp<'a, LLNode<'a>>>>,
             }
+            impl<'a> Traceable for LLNode<'a> {
+                fn set_root_to(&mut self, _b: bool) {}
+                fn is_root(&self) -> bool { false }
+            }
+            let mut heap: DeferredHeap<LLNode> = DeferredHeap::new();
+
+            let mut alloc = heap.allocator();
+            let b: Dp<LLNode> = alloc.insert(Default::default());
+            let c: Dp<LLNode> = alloc.insert(Default::default());
+            let d: Dp<LLNode> = alloc.insert(Default::default());
+            { *b.next.borrow_mut() = Some(c.clone()); }
+            { *c.next.borrow_mut() = Some(d.clone()); }
+            { *d.next.borrow_mut() = Some(b.clone()); }
 
         }
 

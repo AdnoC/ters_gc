@@ -18,7 +18,7 @@ impl<'a> DeferredHeap<'a> {
         DeferredHeap::with_size(page_size::get())
     }
 
-    pub fn with_size(chunk_size: usize) -> DeferredHeap<'a> {
+    pub fn with_size(_chunk_size: usize) -> DeferredHeap<'a> {
         DeferredHeap {
             // chunks: RefCell::new(ChunkList::with_size(chunk_size)),
             _marker: PhantomData,
