@@ -36,7 +36,7 @@ mod traverse_stack {
                 return 0;
             }
             let mut num = 0;
-            if times == 3 {
+            if times == 13 {
                 num = MAGIC_NUM;
                 return recerse_n_times(bottom, times - 1) + num;
             }
