@@ -103,6 +103,7 @@ impl Collector {
         if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
             if !info.is_marked_reachable() {
                 info.mark();
+                assert!(info.is_marked_reachable());
                 children = Some(info.inner_ptrs());
             }
         }
@@ -117,9 +118,11 @@ impl Collector {
 
     pub fn sweep(&mut self) {
         let mut unreachable_objects = vec![];
-        for info in self.allocator.items.values() {
+        for info in self.allocator.items.values_mut() {
             if !info.is_marked_reachable() {
                 unreachable_objects.push(info.ptr);
+            } else {
+                info.unmark();
             }
         }
 
@@ -190,6 +193,7 @@ mod tests {
     fn num_tracked_objs(proxy: &Proxy) -> usize {
         proxy.collector.allocator.items.len()
     }
+    #[inline(never)]
     fn eat_stack_and_exec<F: FnOnce()>(recurs: usize, callback: F) {
         let _nom = [22; 25];
         if recurs > 0 {
