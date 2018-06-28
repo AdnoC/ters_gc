@@ -33,7 +33,7 @@ impl AllocInfo {
         self.marked
     }
 
-    pub(crate) fn inner_ptrs(&self) -> InnerObjectPtrs {
+    pub fn inner_ptrs(&self) -> InnerObjectPtrs {
         use ::std::mem::{ size_of, align_of };
         InnerObjectPtrs {
             ptr: ::round_up(self.ptr as usize, align_of::<usize>()) as *const _,
@@ -69,7 +69,7 @@ impl Iterator for InnerObjectPtrs {
 }
 
 pub(crate) struct Allocator {
-    pub(crate) items: HashMap<*const Never, AllocInfo>,
+    pub items: HashMap<*const Never, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
     max_ptr: usize,
     min_ptr: usize,
