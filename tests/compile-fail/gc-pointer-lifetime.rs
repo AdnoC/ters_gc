@@ -1,5 +1,5 @@
 extern crate terse;
-use terse::collector::*;
+use terse::*;
 
 fn lifetimes_are_properly_constrained() {
     use ::std::mem::drop;
