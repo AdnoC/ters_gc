@@ -47,7 +47,7 @@ impl Collector {
         func(proxy);
     }
 
-    pub fn alloc<T>(&mut self, val: T) -> *mut T {
+    fn alloc<T>(&mut self, val: T) -> *mut T {
         let ptr = self.allocator.alloc(val);
         if self.should_collect() {
             self.run();
@@ -55,12 +55,12 @@ impl Collector {
         ptr
     }
 
-    pub fn run(&mut self) {
+    fn run(&mut self) {
         self.mark();
         self.sweep();
     }
 
-    pub fn mark(&mut self) {
+    fn mark(&mut self) {
         unsafe { ::reg_flush::flush_registers_and_call(Collector::mark_landingpad, self as *mut Collector as *mut _) };
     }
 
@@ -122,7 +122,7 @@ impl Collector {
         }
     }
 
-    pub fn sweep(&mut self) {
+    fn sweep(&mut self) {
         let mut unreachable_objects = vec![];
         for info in self.allocator.items.values_mut() {
             if !info.is_marked_reachable() {
@@ -143,10 +143,10 @@ impl Collector {
         }
     }
 
-    pub fn pause(&mut self) {
+    fn pause(&mut self) {
         self.paused = true;
     }
-    pub fn unpause(&mut self) {
+    fn unpause(&mut self) {
         self.paused = false;
     }
     // While allocator is active, all pointers to Collector are valid (since the arena
@@ -195,7 +195,6 @@ impl<'a> Proxy<'a> {
     pub fn sweep(&mut self) {
         self.collector.sweep();
     }
-
     pub fn pause(&mut self) {
         self.collector.pause();
     }
