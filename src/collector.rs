@@ -47,7 +47,7 @@ impl Collector {
         func(proxy);
     }
 
-    fn alloc<T>(&mut self, val: T) -> *mut T {
+    fn alloc<T>(&mut self, val: T) -> *const T {
         let ptr = self.allocator.alloc(val);
         if self.should_collect() {
             self.run();
@@ -174,9 +174,6 @@ pub struct Proxy<'arena> {
 }
 
 impl<'a> Proxy<'a> {
-    // fn alloc<T>(&mut self) -> *mut T {
-    //     unimplemented!()
-    // }
     pub fn store<T>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
         Gc {
@@ -204,7 +201,7 @@ impl<'a> Proxy<'a> {
 
 #[derive(Clone)]
 pub struct Gc<'arena, T> {
-    _marker: PhantomData<*mut &'arena ()>,
+    _marker: PhantomData<*const &'arena ()>,
     ptr: *const T,
 }
 
