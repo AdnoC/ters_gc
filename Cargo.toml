@@ -1,5 +1,5 @@
 [package]
-name = "deferred_heaprs"
+name = "terse"
 version = "0.1.0"
 authors = ["AdnoC <adam.r.cutler@gmail.com>"]
 
