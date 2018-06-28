@@ -7,8 +7,8 @@ use ::allocator::Allocator;
 macro_rules! stack_ptr {
     () => {
         {
-            let a = ();
-            (&a) as *const ()
+            let a = 0usize; // usize so that it is aligned
+            (&a) as *const _ as *const ()
         }
     }
 }
@@ -90,8 +90,6 @@ impl Collector {
         if top == bottom {
             return;
         }
-
-        let bottom = ::round_up(bottom, align_of::<usize>());
 
         for addr in (bottom..top).step_by(size_of::<usize>()) {
             let stack_ptr = addr as *const *const Never;
