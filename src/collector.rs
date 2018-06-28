@@ -16,7 +16,7 @@ macro_rules! stack_ptr {
 pub struct Collector {
     allocator: Allocator,
     collection_threshold: usize,
-    load_factor: f64,
+    // load_factor: f64,
     sweep_factor: f64,
     paused: bool,
     stack_bottom: *const (),
@@ -27,13 +27,15 @@ impl Collector {
         Collector {
             allocator: Allocator::new(),
             collection_threshold: 25,
-            load_factor: 0.9,
+            // load_factor: 0.9,
             sweep_factor: 0.5,
             paused: false,
             stack_bottom: 0 as *const (),
         }
     }
 
+    /// Unsafe because there is an unsafe hole in garbage collection that cannot
+    /// be fixed. Namely, you cannot store pointers to tracked objects on the heap.
     pub unsafe fn run_with_gc<T: FnOnce(Proxy)>(&mut self, func: T) {
         self.stack_bottom = stack_ptr!();
         self.inner_run_with_gc(func);
@@ -46,7 +48,11 @@ impl Collector {
     }
 
     pub fn alloc<T>(&mut self, val: T) -> *mut T {
-        self.allocator.alloc(val)
+        let ptr = self.allocator.alloc(val);
+        if self.should_collect() {
+            self.run();
+        }
+        ptr
     }
 
     pub fn run(&mut self) {
@@ -130,18 +136,37 @@ impl Collector {
             self.allocator.free(ptr);
         }
 
+        self.update_collection_threshold();
+
         if self.allocator.should_shrink_items() {
             self.allocator.shrink_items();
         }
     }
 
+    pub fn pause(&mut self) {
+        self.paused = true;
+    }
+    pub fn unpause(&mut self) {
+        self.paused = false;
+    }
     // While allocator is active, all pointers to Collector are valid (since the arena
     // can't be moved while there is a reference to it)
-    // TODO: Make private
+    // FIXME: Make private
     pub fn proxy(&mut self) -> Proxy {
         Proxy {
             collector: self,
         }
+    }
+
+    fn update_collection_threshold(&mut self) {
+        let num_tracked = self.allocator.items.len();
+        let additional = (num_tracked as f64 * self.sweep_factor) as usize;
+        self.collection_threshold = num_tracked + additional + 1;
+    }
+
+    fn should_collect(&self) -> bool {
+        let num_tracked = self.allocator.items.len();
+        !self.paused && num_tracked > self.collection_threshold
     }
 }
 
@@ -169,6 +194,13 @@ impl<'a> Proxy<'a> {
     }
     pub fn sweep(&mut self) {
         self.collector.sweep();
+    }
+
+    pub fn pause(&mut self) {
+        self.collector.pause();
+    }
+    pub fn unpause(&mut self) {
+        self.collector.unpause();
     }
 }
 
