@@ -94,13 +94,13 @@ impl Collector {
         let bottom = ::round_up(bottom, align_of::<usize>());
 
         for addr in (bottom..top).step_by(size_of::<usize>()) {
-            let stack_ptr = addr as *const *mut Never;
+            let stack_ptr = addr as *const *const Never;
             let stack_value = unsafe { *stack_ptr };
             self.mark_ptr(stack_value);
         }
     }
 
-    fn mark_ptr(&mut self, ptr: *mut Never) {
+    fn mark_ptr(&mut self, ptr: *const Never) {
         if !self.allocator.is_ptr_in_range(ptr) {
             return;
         }
@@ -116,7 +116,7 @@ impl Collector {
         if let Some(children) = children {
             for val in children {
                 let val = unsafe { *val };
-                self.mark_ptr(val as *mut Never);
+                self.mark_ptr(val as *const Never);
             }
         }
     }

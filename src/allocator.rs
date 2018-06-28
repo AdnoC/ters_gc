@@ -4,8 +4,8 @@ use ::Never;
 
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
-    pub ptr: *mut Never,
-    rebox: fn(*mut Never),
+    pub ptr: *const Never,
+    rebox: fn(*const Never),
     marked: bool,
     size: usize,
 }
@@ -14,7 +14,7 @@ impl AllocInfo {
     fn new<T>(value: T) -> AllocInfo {
         use std::mem::size_of;
         AllocInfo {
-            ptr: store_single_value(value) as *mut _,
+            ptr: store_single_value(value) as *const _,
             rebox: get_rebox::<T>(),
             marked: false,
             size: size_of::<T>(),
@@ -36,7 +36,7 @@ impl AllocInfo {
     pub(crate) fn inner_ptrs(&self) -> InnerObjectPtrs {
         use ::std::mem::{ size_of, align_of };
         InnerObjectPtrs {
-            ptr: ::round_up(self.ptr as usize, align_of::<usize>()) as *mut _,
+            ptr: ::round_up(self.ptr as usize, align_of::<usize>()) as *const _,
             idx: 0,
             length: (self.size / size_of::<usize>()) as isize,
         }
@@ -50,13 +50,13 @@ impl Drop for AllocInfo {
 }
 
 pub(crate) struct InnerObjectPtrs {
-    ptr: *mut usize,
+    ptr: *const usize,
     idx: isize,
     length: isize,
 }
 
 impl Iterator for InnerObjectPtrs {
-    type Item = *mut usize;
+    type Item = *const usize;
     fn next(&mut self) -> Option<Self::Item> {
         if self.idx >= self.length {
             return None;
@@ -69,7 +69,7 @@ impl Iterator for InnerObjectPtrs {
 }
 
 pub(crate) struct Allocator {
-    pub(crate) items: HashMap<*mut Never, AllocInfo>,
+    pub(crate) items: HashMap<*const Never, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
     max_ptr: usize,
     min_ptr: usize,
@@ -83,23 +83,23 @@ impl Allocator {
             min_ptr: ::std::usize::MAX,
         }
     }
-    pub fn alloc<T>(&mut self, value: T) -> *mut T {
+    pub fn alloc<T>(&mut self, value: T) -> *const T {
         use std::cmp::{min, max};
         let info = AllocInfo::new(value);
         // self.max_ptr = max(self.max_ptr, info.ptr as usize);
         // self.min_ptr = min(self.min_ptr, info.ptr as usize);
         let ptr = info.ptr;
         self.items.insert(ptr, info);
-        ptr as *mut _
+        ptr as *const _
     }
-    pub fn free<T>(&mut self, ptr: *mut T) {
-        self.items.remove(&(ptr as *mut _)); // Will be deallocated by Drop
+    pub fn free<T>(&mut self, ptr: *const T) {
+        self.items.remove(&(ptr as *const _)); // Will be deallocated by Drop
     }
-    pub fn remove<T>(&mut self, ptr: *mut T) -> T {
+    pub fn remove<T>(&mut self, ptr: *const T) -> T {
         use ::std::mem::forget;
-        let item = self.items.remove(&(ptr as *mut _));
+        let item = self.items.remove(&(ptr as *const _));
         forget(item);
-        let boxed = unsafe { Box::from_raw(ptr) };
+        let boxed = unsafe { Box::from_raw(ptr as *mut _) };
         *boxed
     }
 
@@ -110,12 +110,12 @@ impl Allocator {
     }
 
     pub fn is_ptr_tracked<T>(&self, ptr: *const T) -> bool {
-        let ptr: *mut Never = ptr as *const _ as *mut _;
+        let ptr: *const Never = ptr as *const _;
         self.items.contains_key(&ptr)
     }
 
     pub(crate) fn info_for_ptr_mut<T>(&mut self, ptr: *const T) -> Option<&mut AllocInfo> {
-        let ptr: *mut Never = ptr as *const _ as *mut _;
+        let ptr: *const Never = ptr as *const _;
         self.items.get_mut(&ptr)
     }
 
@@ -126,7 +126,7 @@ impl Allocator {
     pub fn shrink_items(&mut self) {}
 }
 
-fn store_single_value<T>(value: T) -> *mut T {
+fn store_single_value<T>(value: T) -> *const T {
     let storage = Box::new(value);
     Box::leak(storage)
 }
@@ -139,8 +139,8 @@ fn store_single_value<T>(value: T) -> *mut T {
 //     ptr
 // }
 
-fn get_rebox<T>() -> fn(*mut Never) {
-    |ptr: *mut Never| unsafe { Box::<T>::from_raw(ptr as *mut _); }
+fn get_rebox<T>() -> fn(*const Never) {
+    |ptr: *const Never| unsafe { Box::<T>::from_raw(ptr as *const _ as *mut _); }
 }
 
 #[cfg(test)]
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn returns_valid_ptrs() {
         let mut alloc = Allocator::new();
-        let mut num = alloc.alloc(22);
+        let mut num = alloc.alloc(22) as *mut _;
         unsafe {
             assert_eq!(*num, 22);
             *num = 42;
