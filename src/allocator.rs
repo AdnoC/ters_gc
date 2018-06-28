@@ -1,20 +1,44 @@
 use std::collections::HashMap;
 
-enum Never {}
+use ::Never;
 
 /// Type-erased allocation info
-struct AllocInfo {
+pub struct AllocInfo {
     ptr: *mut Never,
     rebox: fn(*mut Never),
     marked: bool,
+    size: usize,
 }
 
 impl AllocInfo {
     fn new<T>(value: T) -> AllocInfo {
+        use std::mem::size_of;
         AllocInfo {
             ptr: store_single_value(value) as *mut _,
             rebox: get_rebox::<T>(),
             marked: false,
+            size: size_of::<T>(),
+        }
+    }
+
+    pub fn mark(&mut self) {
+        self.marked = true;
+    }
+
+    pub fn unmark(&mut self) {
+        self.marked = false;
+    }
+
+    pub fn is_marked_reachable(&self) -> bool {
+        self.marked
+    }
+
+    pub fn inner_ptrs(&self) -> InnerObjectPtrs {
+        use ::std::mem::size_of;
+        InnerObjectPtrs {
+            ptr: self.ptr as *mut _,
+            idx: 0,
+            length: (self.size / size_of::<usize>()) as isize,
         }
     }
 }
@@ -25,7 +49,26 @@ impl Drop for AllocInfo {
     }
 }
 
-struct Allocator {
+pub struct InnerObjectPtrs {
+    ptr: *mut usize,
+    idx: isize,
+    length: isize,
+}
+
+impl Iterator for InnerObjectPtrs {
+    type Item = *mut usize;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx >= self.length {
+            return None;
+        }
+        
+        self.idx += 1;
+
+        Some(unsafe { self.ptr.offset(self.idx - 1) })
+    }
+}
+
+pub struct Allocator {
     items: HashMap<*mut Never, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
     max_ptr: usize,
@@ -40,7 +83,7 @@ impl Allocator {
             min_ptr: ::std::usize::MAX,
         }
     }
-    fn alloc<T>(&mut self, value: T) -> *mut T {
+    pub fn alloc<T>(&mut self, value: T) -> *mut T {
         use std::cmp::{min, max};
         let info = AllocInfo::new(value);
         self.max_ptr = max(self.max_ptr, info.ptr as usize);
@@ -49,15 +92,30 @@ impl Allocator {
         self.items.insert(ptr, info);
         ptr as *mut _
     }
-    fn free<T>(&mut self, ptr: *mut T) {
+    pub fn free<T>(&mut self, ptr: *mut T) {
         self.items.remove(&(ptr as *mut _)); // Will be deallocated by Drop
     }
-    fn remove<T>(&mut self, ptr: *mut T) -> T {
+    pub fn remove<T>(&mut self, ptr: *mut T) -> T {
         use ::std::mem::forget;
         let item = self.items.remove(&(ptr as *mut _));
         forget(item);
         let boxed = unsafe { Box::from_raw(ptr) };
         *boxed
+    }
+
+    pub fn is_ptr_in_range<T>(&self, ptr: *const T) -> bool {
+        let ptr_val = ptr as usize;
+        self.min_ptr >= ptr_val && self.max_ptr <= ptr_val
+    }
+
+    pub fn is_ptr_tracked<T>(&self, ptr: *const T) -> bool {
+        let ptr: *mut Never = ptr as *const _ as *mut _;
+        self.items.contains_key(&ptr)
+    }
+
+    pub fn info_for_ptr_mut<T>(&mut self, ptr: *const T) -> Option<&mut AllocInfo> {
+        let ptr: *mut Never = ptr as *const _ as *mut _;
+        self.items.get_mut(&ptr)
     }
 }
 

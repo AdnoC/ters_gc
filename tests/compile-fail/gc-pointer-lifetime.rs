@@ -4,7 +4,7 @@ use terse::collector::*;
 fn lifetimes_are_properly_constrained() {
     use ::std::mem::drop;
     let mut collector = Collector::new();
-    let mut alloc = collector.allocator();
+    let mut alloc = collector.proxy();
 
     let gc_ptr = alloc.store(42);
 
