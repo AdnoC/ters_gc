@@ -1,5 +1,6 @@
-pub struct Arena;
 use std::marker::PhantomData;
+
+pub struct Arena;
 
 impl Arena {
     pub fn new() -> Arena {
