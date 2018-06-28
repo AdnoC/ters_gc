@@ -156,7 +156,7 @@ impl Collector {
     fn pause(&mut self) {
         self.paused = true;
     }
-    fn unpause(&mut self) {
+    fn resume(&mut self) {
         self.paused = false;
     }
     // While allocator is active, all pointers to Collector are valid (since the arena
@@ -205,8 +205,8 @@ impl<'a> Proxy<'a> {
     pub fn pause(&mut self) {
         self.collector.pause();
     }
-    pub fn unpause(&mut self) {
-        self.collector.unpause();
+    pub fn resume(&mut self) {
+        self.collector.resume();
     }
 }
 
@@ -337,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn unpause_also_works() {
+    fn resume_also_works() {
         let mut col = Collector::new();
         let threshold = col.collection_threshold;
         let num_useful = 13;
@@ -368,7 +368,7 @@ mod tests {
             });
             assert_eq!(num_tracked_objs(&proxy), threshold);
             proxy.pause();
-            proxy.unpause();
+            proxy.resume();
             head = prepend_ll!();//(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
         };
