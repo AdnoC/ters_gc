@@ -1,2 +1,2 @@
 
-pub mod arena;
+pub mod collector;

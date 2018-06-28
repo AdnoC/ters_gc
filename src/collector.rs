@@ -1,13 +1,15 @@
 use std::marker::PhantomData;
 
-pub struct Arena;
+pub struct Collector {
 
-impl Arena {
-    pub fn new() -> Arena {
+}
+
+impl Collector {
+    pub fn new() -> Collector {
         unimplemented!()
     }
 
-    // While allocator is active, all pointers to Arena are valid (since the arena
+    // While allocator is active, all pointers to Collector are valid (since the arena
     // can't be moved while there is a reference to it)
     pub fn allocator(&mut self) -> Allocator {
         Allocator {
@@ -17,7 +19,7 @@ impl Arena {
 }
 
 pub struct Allocator<'arena> {
-        arena: &'arena mut Arena,
+        arena: &'arena mut Collector,
 }
 
 impl<'a> Allocator<'a> {
