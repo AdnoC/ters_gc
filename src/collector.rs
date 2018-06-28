@@ -1,7 +1,10 @@
 use std::marker::PhantomData;
 
 pub struct Collector {
-
+    collection_threshold: usize,
+    load_factor: f64,
+    sweep_factor: f64,
+    paused: bool,
 }
 
 impl Collector {
