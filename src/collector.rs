@@ -289,4 +289,81 @@ mod tests {
         };
         unsafe { col.run_with_gc(body) };
     }
+
+    #[test]
+    fn pause_works() {
+        let mut col = Collector::new();
+        let threshold = col.collection_threshold;
+        let num_useful = 13;
+        let num_wasted = threshold - num_useful;
+        assert!(threshold > num_useful);
+
+        let body = |mut proxy: Proxy| {
+            let mut head = LinkedList {
+                next: None,
+            };
+            macro_rules! prepend_ll {
+                () => {
+                    {
+                        let boxed = proxy.store(head);
+                        LinkedList {
+                            next: Some(boxed),
+                        }
+                    }
+                }
+            }
+            for _ in 0..num_useful {
+                head = prepend_ll!();//(&mut proxy, head);
+            }
+            eat_stack_and_exec(10, || {
+                for _ in 0..num_wasted {
+                    proxy.store(22);
+                }
+            });
+            assert_eq!(num_tracked_objs(&proxy), threshold);
+            proxy.pause();
+            head = prepend_ll!();//(&mut proxy, head);
+            assert_eq!(num_tracked_objs(&proxy), threshold + 1);
+        };
+        unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn unpause_also_works() {
+        let mut col = Collector::new();
+        let threshold = col.collection_threshold;
+        let num_useful = 13;
+        let num_wasted = threshold - num_useful;
+        assert!(threshold > num_useful);
+
+        let body = |mut proxy: Proxy| {
+            let mut head = LinkedList {
+                next: None,
+            };
+            macro_rules! prepend_ll {
+                () => {
+                    {
+                        let boxed = proxy.store(head);
+                        LinkedList {
+                            next: Some(boxed),
+                        }
+                    }
+                }
+            }
+            for _ in 0..num_useful {
+                head = prepend_ll!();//(&mut proxy, head);
+            }
+            eat_stack_and_exec(10, || {
+                for _ in 0..num_wasted {
+                    proxy.store(22);
+                }
+            });
+            assert_eq!(num_tracked_objs(&proxy), threshold);
+            proxy.pause();
+            proxy.unpause();
+            head = prepend_ll!();//(&mut proxy, head);
+            assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
+        };
+        unsafe { col.run_with_gc(body) };
+    }
 }
