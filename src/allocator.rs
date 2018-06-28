@@ -35,10 +35,15 @@ impl AllocInfo {
 
     pub fn inner_ptrs(&self) -> InnerObjectPtrs {
         use ::std::mem::{ size_of, align_of };
+        let aligned_ptr = round_up(self.ptr as usize, align_of::<usize>()) as *const _;
+        let diff = aligned_ptr as usize - self.ptr as usize;
+        let mut length = if self.size > diff {
+            ((self.size - diff) / size_of::<usize>()) as isize
+        } else { 0 };
         InnerObjectPtrs {
-            ptr: ::round_up(self.ptr as usize, align_of::<usize>()) as *const _,
+            ptr: aligned_ptr,
             idx: 0,
-            length: (self.size / size_of::<usize>()) as isize,
+            length,
         }
     }
 }
@@ -141,6 +146,11 @@ fn store_single_value<T>(value: T) -> *const T {
 
 fn get_rebox<T>() -> fn(*const Never) {
     |ptr: *const Never| unsafe { Box::<T>::from_raw(ptr as *const _ as *mut _); }
+}
+
+#[inline]
+fn round_up(base: usize, align: usize) -> usize {
+    base.checked_add(align - 1).unwrap() & !(align - 1)
 }
 
 #[cfg(test)]
