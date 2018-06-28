@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use ::Never;
 
 /// Type-erased allocation info
-pub struct AllocInfo {
-    ptr: *mut Never,
+pub(crate) struct AllocInfo {
+    pub ptr: *mut Never,
     rebox: fn(*mut Never),
     marked: bool,
     size: usize,
@@ -33,10 +33,10 @@ impl AllocInfo {
         self.marked
     }
 
-    pub fn inner_ptrs(&self) -> InnerObjectPtrs {
-        use ::std::mem::size_of;
+    pub(crate) fn inner_ptrs(&self) -> InnerObjectPtrs {
+        use ::std::mem::{ size_of, align_of };
         InnerObjectPtrs {
-            ptr: self.ptr as *mut _,
+            ptr: ::round_up(self.ptr as usize, align_of::<usize>()) as *mut _,
             idx: 0,
             length: (self.size / size_of::<usize>()) as isize,
         }
@@ -49,7 +49,7 @@ impl Drop for AllocInfo {
     }
 }
 
-pub struct InnerObjectPtrs {
+pub(crate) struct InnerObjectPtrs {
     ptr: *mut usize,
     idx: isize,
     length: isize,
@@ -68,15 +68,15 @@ impl Iterator for InnerObjectPtrs {
     }
 }
 
-pub struct Allocator {
-    items: HashMap<*mut Never, AllocInfo>,
+pub(crate) struct Allocator {
+    pub(crate) items: HashMap<*mut Never, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
     max_ptr: usize,
     min_ptr: usize,
 }
 
 impl Allocator {
-    fn new() -> Allocator {
+    pub fn new() -> Allocator {
         Allocator {
             items: Default::default(),
             max_ptr: 0,
@@ -113,10 +113,16 @@ impl Allocator {
         self.items.contains_key(&ptr)
     }
 
-    pub fn info_for_ptr_mut<T>(&mut self, ptr: *const T) -> Option<&mut AllocInfo> {
+    pub(crate) fn info_for_ptr_mut<T>(&mut self, ptr: *const T) -> Option<&mut AllocInfo> {
         let ptr: *mut Never = ptr as *const _ as *mut _;
         self.items.get_mut(&ptr)
     }
+
+    pub fn should_shrink_items(&self) -> bool {
+        false
+    }
+
+    pub fn shrink_items(&mut self) {}
 }
 
 fn store_single_value<T>(value: T) -> *mut T {
@@ -137,7 +143,7 @@ fn get_rebox<T>() -> fn(*mut Never) {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use std::{
         rc::Rc,
