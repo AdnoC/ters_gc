@@ -162,7 +162,7 @@ impl Collector {
     // While allocator is active, all pointers to Collector are valid (since the arena
     // can't be moved while there is a reference to it)
     // FIXME: Make private
-    pub fn proxy(&mut self) -> Proxy {
+    fn proxy(&mut self) -> Proxy {
         Proxy {
             collector: self,
         }
@@ -375,4 +375,3 @@ mod tests {
         unsafe { col.run_with_gc(body) };
     }
 }
-

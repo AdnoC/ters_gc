@@ -3,16 +3,17 @@ use terse::*;
 
 fn lifetimes_are_properly_constrained() {
     use ::std::mem::drop;
+    use std::{
+        rc::Rc,
+        cell::RefCell,
+    };
+    let mut gc_ptr = Rc::new(RefCell::new(None));
     let mut collector = Collector::new();
-    let mut alloc = collector.proxy();
-
-    let gc_ptr = alloc.store(42);
-
-    drop(alloc);
-
-    // Should borrowck error. Can't move collector since it is borrowed by gc_ptr
-    let collector2 = collector; //~ ERROR cannot move out of `collector` because it is borrowed
-
+    unsafe {
+        collector.run_with_gc(move |proxy| {
+            *gc_ptr.borrow_mut() = Some(proxy.store(42)); //~ ERROR borrowed data cannot be stored outside of its closure
+        })
+    }
 }
 
 fn main() { }
