@@ -49,15 +49,15 @@ impl Collector {
 
     /// Unsafe because there is an unsafe hole in garbage collection that cannot
     /// be fixed. Namely, you cannot store pointers to tracked objects on the heap.
-    pub unsafe fn run_with_gc<T: FnOnce(Proxy)>(&mut self, func: T) {
+    pub unsafe fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
         self.stack_bottom = stack_ptr!();
-        self.inner_run_with_gc(func);
+        self.inner_run_with_gc(func)
     }
 
     #[inline(never)]
-    fn inner_run_with_gc<T: FnOnce(Proxy)>(&mut self, func: T) {
+    fn inner_run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
         let proxy = self.proxy();
-        func(proxy);
+        func(proxy)
     }
 
     fn alloc<T>(&mut self, val: T) -> *const T {
@@ -373,5 +373,12 @@ mod tests {
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
         };
         unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn returning_a_value_works() {
+        let mut col = Collector::new();
+        let val = unsafe { col.run_with_gc(|proxy| 42) };
+        assert_eq!(val, 42);
     }
 }
