@@ -86,8 +86,8 @@ impl Allocator {
     pub fn alloc<T>(&mut self, value: T) -> *mut T {
         use std::cmp::{min, max};
         let info = AllocInfo::new(value);
-        self.max_ptr = max(self.max_ptr, info.ptr as usize);
-        self.min_ptr = min(self.min_ptr, info.ptr as usize);
+        // self.max_ptr = max(self.max_ptr, info.ptr as usize);
+        // self.min_ptr = min(self.min_ptr, info.ptr as usize);
         let ptr = info.ptr;
         self.items.insert(ptr, info);
         ptr as *mut _
@@ -104,8 +104,9 @@ impl Allocator {
     }
 
     pub fn is_ptr_in_range<T>(&self, ptr: *const T) -> bool {
-        let ptr_val = ptr as usize;
-        self.min_ptr >= ptr_val && self.max_ptr <= ptr_val
+        true
+        // let ptr_val = ptr as usize;
+        // self.min_ptr >= ptr_val && self.max_ptr <= ptr_val
     }
 
     pub fn is_ptr_tracked<T>(&self, ptr: *const T) -> bool {

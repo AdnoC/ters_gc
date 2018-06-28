@@ -109,7 +109,6 @@ impl Collector {
         if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
             if !info.is_marked_reachable() {
                 info.mark();
-                assert!(info.is_marked_reachable());
                 children = Some(info.inner_ptrs());
             }
         }
@@ -179,7 +178,7 @@ impl<'a> Proxy<'a> {
     //     unimplemented!()
     // }
     pub fn store<T>(&mut self, payload: T) -> Gc<'a, T> {
-        let ptr = self.collector.allocator.alloc(payload);
+        let ptr = self.collector.alloc(payload);
         Gc {
             _marker: PhantomData,
             ptr,
@@ -221,6 +220,10 @@ impl<'a, T> Deref for Gc<'a, T> {
 mod tests {
     use super::*;
 
+    struct LinkedList<'a> {
+        next: Option<Gc<'a, LinkedList<'a>>>
+    }
+
     fn num_tracked_objs(proxy: &Proxy) -> usize {
         proxy.collector.allocator.items.len()
     }
@@ -246,6 +249,43 @@ mod tests {
             });
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 0);
+        };
+        unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn collects_after_reaching_threshold() {
+        let mut col = Collector::new();
+        let threshold = col.collection_threshold;
+        let num_useful = 13;
+        let num_wasted = threshold - num_useful;
+        assert!(threshold > num_useful);
+
+        let body = |mut proxy: Proxy| {
+            let mut head = LinkedList {
+                next: None,
+            };
+            macro_rules! prepend_ll {
+                () => {
+                    {
+                        let boxed = proxy.store(head);
+                        LinkedList {
+                            next: Some(boxed),
+                        }
+                    }
+                }
+            }
+            for _ in 0..num_useful {
+                head = prepend_ll!();//(&mut proxy, head);
+            }
+            eat_stack_and_exec(10, || {
+                for _ in 0..num_wasted {
+                    proxy.store(22);
+                }
+            });
+            assert_eq!(num_tracked_objs(&proxy), threshold);
+            head = prepend_ll!();//(&mut proxy, head);
+            assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
         };
         unsafe { col.run_with_gc(body) };
     }
