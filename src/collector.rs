@@ -11,18 +11,18 @@ impl Collector {
 
     // While allocator is active, all pointers to Collector are valid (since the arena
     // can't be moved while there is a reference to it)
-    pub fn allocator(&mut self) -> Allocator {
-        Allocator {
-            arena: self,
+    pub fn allocator(&mut self) -> Proxy {
+        Proxy {
+            collector: self,
         }
     }
 }
 
-pub struct Allocator<'arena> {
-        arena: &'arena mut Collector,
+pub struct Proxy<'arena> {
+    collector: &'arena mut Collector,
 }
 
-impl<'a> Allocator<'a> {
+impl<'a> Proxy<'a> {
     fn alloc<T>(&mut self) -> *mut T {
         unimplemented!()
     }
