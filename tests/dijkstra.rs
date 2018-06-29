@@ -16,7 +16,7 @@ use std::hash::{Hash, Hasher};
 
 
 type GcNode<'a> = PrintWrapper<Gc<'a, Node<'a>>>;
-type GcEdge<'a> = Gc<'a, Edge<'a>>;
+type GcEdge<'a> = PrintWrapper<Gc<'a, Edge<'a>>>;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct PrintWrapper<P>
@@ -72,7 +72,13 @@ impl<'a> Graph<'a> {
 
     // Removes all references to a node from everything in the graph.
     // Since we are using a GC its fine if references to it exist outside of us.
-    fn remove_node(&mut self, name: &str) -> Option<GcNode<'a>> {
+    fn remove_node_by_name(&mut self, name: &str) -> Option<GcNode<'a>> {
+        for node in &self.nodes {
+            let idx = node.adjacencies.borrow().iter().position(|edge| edge.dest.name == name);
+            if let Some(idx) = idx {
+                node.adjacencies.borrow_mut().remove(idx);
+            }
+        }
         let idx = self.nodes.iter().position(|node| node.name == name);
         idx.map(|idx| self.nodes.remove(idx))
     }
@@ -118,7 +124,7 @@ impl<'a> Graph<'a> {
                 if new_next_dist < cur_next_dist {
                     *distances.get_mut(&edge.dest).unwrap() = new_next_dist;
                     *prev_in_path.entry(edge.dest.clone()).or_insert(cur.clone()) = cur.clone();
-                    nodes_to_process.change_priority(&edge.dest, new_next_dist);
+                    nodes_to_process.change_priority(&edge.dest, dist_to_priority(new_next_dist));
                 }
             }
         }
@@ -152,8 +158,15 @@ struct Node<'a> {
 impl<'a> Node<'a> {
     fn connect_to(&self, proxy: &mut Proxy<'a>, dest: GcNode<'a>, weight: u32) {
         assert!(self.adjacencies.borrow().len() < self.adjacencies.borrow().inline_size() - 1);
-        let edge = proxy.store(Edge { dest, weight });
+        let edge = PrintWrapper { ptr: proxy.store(Edge { dest, weight }) };
         self.adjacencies.borrow_mut().push(edge);
+    }
+
+    fn disconnect_from(&self, dest: GcNode<'a>) {
+        let idx = self.adjacencies.borrow().iter().position(|edge| edge.dest.name == dest.name);
+        if let Some(idx) = idx {
+            self.adjacencies.borrow_mut().remove(idx);
+        }
     }
 
     fn weight_to(&self, dest: GcNode<'a>) -> Option<u32> {
@@ -170,7 +183,7 @@ fn connect_bidirectional<'a>(proxy: &mut Proxy<'a>, a: GcNode<'a>, b: GcNode<'a>
 
 impl<'a> fmt::Debug for Node<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Node {{ name: {}, adjacencies: {} }}", self.name, self.adjacencies.borrow().len())
+        write!(f, "Node {{ name: {}, adjacencies: {:#?} }}", self.name, self.adjacencies.borrow())
     }
 }
 
@@ -192,6 +205,11 @@ impl<'a> Hash for Node<'a> {
 struct Edge<'a> {
     dest: GcNode<'a>,
     weight: u32,
+}
+impl<'a> fmt::Debug for Edge<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Edge {{ name: {}, weight: {} }}", self.dest.name, self.weight)
+    }
 }
 
 // Cities by airport code
@@ -215,7 +233,7 @@ const SAN: &str = "San Diego";
 // PATH: 1 -> 3 -> 6 -> 5   COST: 20
 //          1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16
 //         DTW ATL IAH JFK SFO LAS MCO PHX MIA DEN LAX BOS ORD PHL DCA SAN
-// 1   DTW      7   9           14
+// 1   DTW     !7   9           14
 // 2   ATL  7       10  15
 // 3   IAH  9   10      11      2
 // 4   JFK      15  11      6
@@ -232,6 +250,25 @@ const SAN: &str = "San Diego";
 // 15  DCA
 // 16  SAN
 
+// PATH: 1 -> 12 -> 10 -> 8 -> 4 -> 5   COST: 43
+//     TO   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16
+// FROM    DTW ATL IAH JFK SFO LAS MCO PHX MIA DEN LAX BOS ORD PHL DCA SAN
+// 1   DTW                      14  5                   5
+// 2   ATL
+// 3   IAH
+// 4   JFK                  6
+// 5   SFO  1           6       9
+// 6   LAS  14              42              4
+// 7   MCO  5                                   7
+// 8   PHX              13                      16  4
+// 9   MIA                      4                   4
+// 10  DEN                          7   16              3
+// 11  LAX                              4   4
+// 12  BOS  5                                   3
+// 13  ORD
+// 14  PHL
+// 15  DCA
+// 16  SAN
 
 #[test]
 fn dijkstra_is_cool() {
@@ -240,6 +277,8 @@ fn dijkstra_is_cool() {
 
         initialize_graph(&mut proxy, &mut graph);
         test_first_path(&graph);
+        secede_texas(&mut proxy, &mut graph);
+        test_second_path(&graph);
     };
 
     let mut col = Collector::new();
@@ -290,6 +329,55 @@ fn dijkstra_is_cool() {
         assert_eq!(20, path_weight);
     }
 
+    // Texas decided to secede from the US and become its own nation,
+    // a theocracy centered on the Church of BBQ. Several other states
+    // followed it.
+    // For some reason the US government isn't happy about this.
+    // It prohibited flights to/from the seceded states.
+    // To show the BBQ-ans how much cooler the US is, they decided to create new
+    // airports.
+    fn secede_texas<'a>(proxy: &mut Proxy<'a>, graph: &mut Graph<'a>) {
+        graph.remove_node_by_name(IAH);
+        graph.remove_node_by_name(ATL);
+        let pre_tracked = proxy.num_tracked();
+        proxy.run();
+        let post_tracked = proxy.num_tracked();
+        assert!(pre_tracked > post_tracked);
 
-    unimplemented!()
+        let dtw = graph.node_by_name(DTW).unwrap();
+        let sfo = graph.node_by_name(SFO).unwrap();
+        let jfk = graph.node_by_name(JFK).unwrap();
+        let las = graph.node_by_name(LAS).unwrap();
+
+        let mco = graph.new_node(proxy, MCO);
+        let phx = graph.new_node(proxy, PHX);
+        let mia = graph.new_node(proxy, MIA);
+        let den = graph.new_node(proxy, DEN);
+        let lax = graph.new_node(proxy, LAX);
+        let bos = graph.new_node(proxy, BOS);
+
+        connect_bidirectional(proxy, dtw.clone(), mco.clone(), 5);
+        connect_bidirectional(proxy, dtw.clone(), bos.clone(), 5);
+        sfo.connect_to(proxy, dtw.clone(), 1);
+        las.disconnect_from(sfo.clone());
+        las.connect_to(proxy, sfo.clone(), 42);
+        connect_bidirectional(proxy, las.clone(), mia.clone(), 4);
+        connect_bidirectional(proxy, mco.clone(), den.clone(), 7);
+        phx.connect_to(proxy, jfk.clone(), 13);
+        connect_bidirectional(proxy, phx.clone(), den.clone(), 16);
+        connect_bidirectional(proxy, phx.clone(), lax.clone(), 4);
+        connect_bidirectional(proxy, mia.clone(), lax.clone(), 4);
+        connect_bidirectional(proxy, den.clone(), bos.clone(), 3);
+    }
+
+    fn test_second_path<'a>(graph: &Graph<'a>) {
+        let dtw = graph.node_by_name(DTW).unwrap();
+        let sfo = graph.node_by_name(SFO).unwrap();
+        let path = graph.path_for(dtw.clone(), sfo.clone()).expect("was unable to find a path");
+        let path_weight: u32 = path.iter()
+            .zip(path.iter().skip(1).cloned())
+            .map(|(src, dst)| src.weight_to(dst).unwrap())
+            .sum();
+        assert_eq!(43, path_weight);
+    }
 }
