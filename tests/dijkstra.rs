@@ -258,10 +258,10 @@ const MIA: &str = "Miami";
 const DEN: &str = "Denver";
 const LAX: &str = "Los Angeles";
 const BOS: &str = "Boston";
-const ORD: &str = "Chicago";
-const PHL: &str = "Philadelphia";
-const DCA: &str = "Washington, D.C.";
-const SAN: &str = "San Diego";
+const _ORD: &str = "Chicago";
+const _PHL: &str = "Philadelphia";
+const _DCA: &str = "Washington, D.C.";
+const _SAN: &str = "San Diego";
 
 // PATH: 1 -> 3 -> 6 -> 5   COST: 20
 //          1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16
