@@ -206,7 +206,7 @@ impl<'a> Proxy<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Gc<'arena, T> {
     _marker: PhantomData<*const &'arena ()>,
     ptr: *const T,
