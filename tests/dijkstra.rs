@@ -1,12 +1,16 @@
-extern crate smallvec;
 extern crate terse;
+extern crate smallvec;
+extern crate priority_queue;
 
+use priority_queue::PriorityQueue;
 use smallvec::SmallVec;
 use terse::*;
 use std::cell::RefCell;
 use std::fmt;
 use std::ops::Deref;
-use std::cmp::{ PartialEq, Eq };
+use std::cmp::{PartialEq, Eq};
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
 // NOTE: Might have problems with SmallVec not clearing values of `remove`d entries
 
@@ -14,7 +18,7 @@ use std::cmp::{ PartialEq, Eq };
 type GcNode<'a> = PrintWrapper<Gc<'a, Node<'a>>>;
 type GcEdge<'a> = Gc<'a, Edge<'a>>;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct PrintWrapper<P>
 where P: Deref, <P as Deref>::Target: fmt::Debug {
     ptr: P
@@ -76,6 +80,67 @@ impl<'a> Graph<'a> {
     fn node_by_name(&self, name: &str) -> Option<GcNode<'a>> {
         self.nodes.iter().find(|node| node.name == name).cloned()
     }
+
+
+    fn path_for(&self, src: GcNode<'a>, dest: GcNode<'a>) -> Option<SmallVec<[GcNode<'a>; 16]>> {
+        // Want lower distance -> higher priority
+        fn dist_to_priority(distance: u64) -> u64 {
+            std::u64::MAX - distance
+        }
+
+        // This __will__ store `Gc`s in the heap where the collector can't
+        // find them. __However__ we aren't touching the collector in this
+        // function (we aren't allocating new garbage collected things or
+        // running it), so while in this function the gc won't collect anything.
+        // So, its fine to store the nodes on the heap.
+        //
+        // Also, all the nodes are stored in the Graph, which is a root.
+        let mut distances: HashMap<GcNode<'a>, u64> = self.nodes.iter()
+            .cloned()
+            .map(|node| (node, std::u64::MAX))
+            .collect();
+        *distances.get_mut(&src).unwrap() = 0;
+        let mut prev_in_path: HashMap<GcNode<'a>, GcNode<'a>> = HashMap::new();
+        let mut nodes_to_process: PriorityQueue<GcNode<'a>, u64> = self.nodes.iter()
+            .cloned()
+            .map(|node| {
+                let dist = distances[&node];
+                (node, dist_to_priority(dist))
+            })
+            .collect();
+
+        while !nodes_to_process.is_empty() {
+            let (cur, _) = nodes_to_process.pop().unwrap();
+            let cur_dist = distances[&cur];
+            for edge in cur.adjacencies.borrow().iter() {
+                let cur_next_dist = distances[&edge.dest];
+                let new_next_dist = cur_dist + edge.weight as u64;
+                if new_next_dist < cur_next_dist {
+                    *distances.get_mut(&edge.dest).unwrap() = new_next_dist;
+                    *prev_in_path.entry(edge.dest.clone()).or_insert(cur.clone()) = cur.clone();
+                    nodes_to_process.change_priority(&edge.dest, new_next_dist);
+                }
+            }
+        }
+
+        // Building the path
+        if !prev_in_path.contains_key(&dest) {
+            return None;
+        }
+
+        let mut path = SmallVec::new();
+        path.push(dest);
+        loop {
+            if let Some(node) = prev_in_path.get(path.last().unwrap()) {
+                path.push(node.clone());
+            } else {
+                break;
+            }
+        }
+
+        path.reverse();
+        Some(path)
+    }
 }
 
 #[derive(Default, Clone)]
@@ -95,10 +160,6 @@ impl<'a> Node<'a> {
         self.adjacencies.borrow().iter()
             .find(|edge| edge.dest == dest)
             .map(|edge| edge.weight)
-    }
-
-    fn path_to(&self, dest: GcNode<'a>) -> Option<SmallVec<[GcNode<'a>; 16]>> {
-        unimplemented!()
     }
 }
 
@@ -120,8 +181,14 @@ impl<'a> PartialEq for Node<'a> {
 }
 impl<'a> Eq for Node<'a> {}
 
+impl<'a> Hash for Node<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
 
-#[derive(Clone, PartialEq, Eq)]
+
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct Edge<'a> {
     dest: GcNode<'a>,
     weight: u32,
@@ -208,12 +275,12 @@ fn dijkstra_is_cool() {
     fn test_first_path<'a>(graph: &Graph<'a>) {
         let dtw = graph.node_by_name(DTW).unwrap();
         let sfo = graph.node_by_name(SFO).unwrap();
-        let path = dtw.clone().path_to(sfo.clone()).expect("was unable to find a path");
+        let path = graph.path_for(dtw.clone(), sfo.clone()).expect("was unable to find a path");
 
         let ord = graph.node_by_name(ORD).unwrap();
         let las = graph.node_by_name(LAS).unwrap();
 
-        let expected = [dtw, sfo, ord, las];
+        let expected = [dtw, ord, las, sfo];
         assert_eq!(&expected, &*path);
 
         let path_weight: u32 = path.iter()

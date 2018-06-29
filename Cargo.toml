@@ -12,6 +12,7 @@ authors = ["AdnoC <adam.r.cutler@gmail.com>"]
 [dev-dependencies]
 compiletest_rs = "*"
 smallvec = "0.6.2"
+priority-queue = "0.5.1"
 
 [build-dependencies]
 cc = "1.0"

@@ -206,7 +206,7 @@ impl<'a> Proxy<'a> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
 pub struct Gc<'arena, T> {
     _marker: PhantomData<*const &'arena ()>,
     ptr: *const T,
