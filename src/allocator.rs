@@ -37,7 +37,7 @@ impl AllocInfo {
         use ::std::mem::{ size_of, align_of };
         let aligned_ptr = round_up(self.ptr as usize, align_of::<usize>()) as *const _;
         let diff = aligned_ptr as usize - self.ptr as usize;
-        let mut length = if self.size > diff {
+        let length = if self.size > diff {
             ((self.size - diff) / size_of::<usize>()) as isize
         } else { 0 };
         InnerObjectPtrs {
@@ -76,20 +76,20 @@ impl Iterator for InnerObjectPtrs {
 pub(crate) struct Allocator {
     pub items: HashMap<*const Never, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
-    max_ptr: usize,
-    min_ptr: usize,
+    // max_ptr: usize,
+    // min_ptr: usize,
 }
 
 impl Allocator {
     pub fn new() -> Allocator {
         Allocator {
             items: Default::default(),
-            max_ptr: 0,
-            min_ptr: ::std::usize::MAX,
+            // max_ptr: 0,
+            // min_ptr: ::std::usize::MAX,
         }
     }
     pub fn alloc<T>(&mut self, value: T) -> *const T {
-        use std::cmp::{min, max};
+        // use std::cmp::{min, max};
         let info = AllocInfo::new(value);
         // self.max_ptr = max(self.max_ptr, info.ptr as usize);
         // self.min_ptr = min(self.min_ptr, info.ptr as usize);
@@ -100,24 +100,24 @@ impl Allocator {
     pub fn free<T>(&mut self, ptr: *const T) {
         self.items.remove(&(ptr as *const _)); // Will be deallocated by Drop
     }
-    pub fn remove<T>(&mut self, ptr: *const T) -> T {
-        use ::std::mem::forget;
-        let item = self.items.remove(&(ptr as *const _));
-        forget(item);
-        let boxed = unsafe { Box::from_raw(ptr as *mut _) };
-        *boxed
-    }
+    // pub fn remove<T>(&mut self, ptr: *const T) -> T {
+    //     use ::std::mem::forget;
+    //     let item = self.items.remove(&(ptr as *const _));
+    //     forget(item);
+    //     let boxed = unsafe { Box::from_raw(ptr as *mut _) };
+    //     *boxed
+    // }
 
-    pub fn is_ptr_in_range<T>(&self, ptr: *const T) -> bool {
+    pub fn is_ptr_in_range<T>(&self, _ptr: *const T) -> bool {
         true
         // let ptr_val = ptr as usize;
         // self.min_ptr >= ptr_val && self.max_ptr <= ptr_val
     }
 
-    pub fn is_ptr_tracked<T>(&self, ptr: *const T) -> bool {
-        let ptr: *const Never = ptr as *const _;
-        self.items.contains_key(&ptr)
-    }
+    // pub fn is_ptr_tracked<T>(&self, ptr: *const T) -> bool {
+    //     let ptr: *const Never = ptr as *const _;
+    //     self.items.contains_key(&ptr)
+    // }
 
     pub(crate) fn info_for_ptr_mut<T>(&mut self, ptr: *const T) -> Option<&mut AllocInfo> {
         let ptr: *const Never = ptr as *const _;
@@ -135,14 +135,6 @@ fn store_single_value<T>(value: T) -> *const T {
     let storage = Box::new(value);
     Box::leak(storage)
 }
-
-// fn get_uninitialized_ptr<T>() -> *mut T {
-//     use ::std::mem::forget;
-//     let mut vec: Vec<T> = Vec::with_capacity(1);
-//     let ptr = vec[0..].as_mut_ptr();
-//     forget(vec);
-//     ptr
-// }
 
 fn get_rebox<T>() -> fn(*const Never) {
     |ptr: *const Never| unsafe { Box::<T>::from_raw(ptr as *const _ as *mut _); }

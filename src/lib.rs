@@ -86,7 +86,7 @@ impl Collector {
 
     #[inline(never)]
     fn mark_stack(&mut self, stack_top: *const ()) {
-        use ::std::mem::{ size_of, align_of };
+        use ::std::mem::size_of;
 
         let top = stack_top as usize;
         let bottom = self.stack_bottom as usize;
