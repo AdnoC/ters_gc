@@ -100,13 +100,13 @@ impl Allocator {
     pub fn free<T>(&mut self, ptr: *const T) {
         self.items.remove(&(ptr as *const _)); // Will be deallocated by Drop
     }
-    // pub fn remove<T>(&mut self, ptr: *const T) -> T {
-    //     use ::std::mem::forget;
-    //     let item = self.items.remove(&(ptr as *const _));
-    //     forget(item);
-    //     let boxed = unsafe { Box::from_raw(ptr as *mut _) };
-    //     *boxed
-    // }
+    pub fn _remove<T>(&mut self, ptr: *const T) -> T {
+        use ::std::mem::forget;
+        let item = self.items.remove(&(ptr as *const _));
+        forget(item);
+        let boxed = unsafe { Box::from_raw(ptr as *mut _) };
+        *boxed
+    }
 
     pub fn is_ptr_in_range<T>(&self, _ptr: *const T) -> bool {
         true
@@ -173,7 +173,7 @@ mod tests {
                 ran_dtor: false,
             }
         }
-        fn incrs(&self, num: usize) -> Vec<CounterIncrementer> {
+        fn _incrs(&self, num: usize) -> Vec<CounterIncrementer> {
             let mut incrs = Vec::with_capacity(num);
             for _ in 0..num {
                 incrs.push(CounterIncrementer {
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn returns_valid_ptrs() {
         let mut alloc = Allocator::new();
-        let mut num = alloc.alloc(22) as *mut _;
+        let num = alloc.alloc(22) as *mut _;
         unsafe {
             assert_eq!(*num, 22);
             *num = 42;
@@ -221,13 +221,13 @@ mod tests {
         alloc.free(num);
 
         let num = alloc.alloc(42);
-        let num_val = alloc.remove(num);
+        let num_val = alloc._remove(num);
         assert_eq!(num_val, 42);
     }
     #[test]
     fn runs_dtor_on_free() {
         let mut alloc = Allocator::new();
-        let mut counter = DtorCounter::new();
+        let counter = DtorCounter::new();
         let ptr = alloc.alloc(counter.incr());
         alloc.free(ptr);
         assert_eq!(counter.count(), 1);

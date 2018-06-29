@@ -246,7 +246,7 @@ mod tests {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
             eat_stack_and_exec(6, || {
-                let num1 = proxy.store(42);
+                let _num1 = proxy.store(42);
                 assert_eq!(num_tracked_objs(&proxy), 1);
                 proxy.run();
                 assert_eq!(num_tracked_objs(&proxy), 1);
@@ -290,6 +290,7 @@ mod tests {
             assert_eq!(num_tracked_objs(&proxy), threshold);
             head = prepend_ll!();//(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
+            assert!(head.next.is_some());
         };
         unsafe { col.run_with_gc(body) };
     }
@@ -326,7 +327,7 @@ mod tests {
             });
             assert_eq!(num_tracked_objs(&proxy), threshold);
             proxy.pause();
-            head = prepend_ll!();//(&mut proxy, head);
+            prepend_ll!();//(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), threshold + 1);
         };
         unsafe { col.run_with_gc(body) };
@@ -365,7 +366,7 @@ mod tests {
             assert_eq!(num_tracked_objs(&proxy), threshold);
             proxy.pause();
             proxy.resume();
-            head = prepend_ll!();//(&mut proxy, head);
+            prepend_ll!();//(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
         };
         unsafe { col.run_with_gc(body) };
@@ -374,7 +375,7 @@ mod tests {
     #[test]
     fn returning_a_value_works() {
         let mut col = Collector::new();
-        let val = unsafe { col.run_with_gc(|proxy| 42) };
+        let val = unsafe { col.run_with_gc(|_proxy| 42) };
         assert_eq!(val, 42);
     }
 }
