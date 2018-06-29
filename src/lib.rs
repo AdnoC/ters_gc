@@ -155,6 +155,10 @@ impl Collector {
     fn resume(&mut self) {
         self.paused = false;
     }
+
+    fn num_tracked(&self) -> usize {
+        self.allocator.items.len()
+    }
     // While allocator is active, all pointers to Collector are valid (since the arena
     // can't be moved while there is a reference to it)
     // FIXME: Make private
@@ -165,13 +169,13 @@ impl Collector {
     }
 
     fn update_collection_threshold(&mut self) {
-        let num_tracked = self.allocator.items.len();
+        let num_tracked = self.num_tracked();
         let additional = (num_tracked as f64 * self.sweep_factor) as usize;
         self.collection_threshold = num_tracked + additional + 1;
     }
 
     fn should_collect(&self) -> bool {
-        let num_tracked = self.allocator.items.len();
+        let num_tracked = self.num_tracked();
         !self.paused && num_tracked > self.collection_threshold
     }
 }
@@ -204,6 +208,9 @@ impl<'a> Proxy<'a> {
     pub fn resume(&mut self) {
         self.collector.resume();
     }
+    pub fn num_tracked(&self) -> usize {
+        self.collector.num_tracked()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
@@ -229,7 +236,7 @@ mod tests {
     }
 
     fn num_tracked_objs(proxy: &Proxy) -> usize {
-        proxy.collector.allocator.items.len()
+        proxy.num_tracked()
     }
     #[inline(never)]
     fn eat_stack_and_exec<F: FnOnce()>(recurs: usize, callback: F) {
