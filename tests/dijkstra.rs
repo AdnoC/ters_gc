@@ -197,7 +197,7 @@ struct Edge<'a> {
 // Cities by airport code
 const DTW: &str = "Detroit";
 const ATL: &str = "Atlanta";
-const ORD: &str = "Chicago";
+const IAH: &str = "Houston";
 const JFK: &str = "New York";
 const SFO: &str = "San Francisco";
 const LAS: &str = "Las Vegas";
@@ -207,17 +207,17 @@ const MIA: &str = "Miami";
 const DEN: &str = "Denver";
 const LAX: &str = "Los Angeles";
 const BOS: &str = "Boston";
-const IAH: &str = "Houston";
+const ORD: &str = "Chicago";
 const PHL: &str = "Philadelphia";
 const DCA: &str = "Washington, D.C.";
 const SAN: &str = "San Diego";
 
 // PATH: 1 -> 3 -> 6 -> 5   COST: 20
 //          1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16
-//         DTW ATL ORD JFK SFO LAS MCO PHX MIA DEN LAX BOS IAH PHL DCA SAN
+//         DTW ATL IAH JFK SFO LAS MCO PHX MIA DEN LAX BOS ORD PHL DCA SAN
 // 1   DTW      7   9           14
 // 2   ATL  7       10  15
-// 3   ORD  9   10      11      2
+// 3   IAH  9   10      11      2
 // 4   JFK      15  11      6
 // 5   SFO              6       9
 // 6   LAS  14      2       9
@@ -227,7 +227,7 @@ const SAN: &str = "San Diego";
 // 10  DEN
 // 11  LAX
 // 12  BOS
-// 13  IAH
+// 13  ORD
 // 14  PHL
 // 15  DCA
 // 16  SAN
@@ -248,18 +248,18 @@ fn dijkstra_is_cool() {
     fn initialize_graph<'a>(proxy: &mut Proxy<'a>, graph: &mut Graph<'a>) {
         let dtw = graph.new_node(proxy, DTW);
         let atl = graph.new_node(proxy, ATL);
-        let ord = graph.new_node(proxy, ORD);
+        let iah = graph.new_node(proxy, IAH);
         let jfk = graph.new_node(proxy, JFK);
         let sfo = graph.new_node(proxy, SFO);
         let las = graph.new_node(proxy, LAS);
 
         connect_bidirectional(proxy, dtw.clone(), atl.clone(), 7);
-        connect_bidirectional(proxy, dtw.clone(), ord.clone(), 9);
+        connect_bidirectional(proxy, dtw.clone(), iah.clone(), 9);
         connect_bidirectional(proxy, dtw.clone(), las.clone(), 14);
-        connect_bidirectional(proxy, atl.clone(), ord.clone(), 10);
+        connect_bidirectional(proxy, atl.clone(), iah.clone(), 10);
         connect_bidirectional(proxy, atl.clone(), jfk.clone(), 15);
-        connect_bidirectional(proxy, ord.clone(), jfk.clone(), 11);
-        connect_bidirectional(proxy, ord.clone(), las.clone(), 2);
+        connect_bidirectional(proxy, iah.clone(), jfk.clone(), 11);
+        connect_bidirectional(proxy, iah.clone(), las.clone(), 2);
         connect_bidirectional(proxy, jfk.clone(), sfo.clone(), 6);
         connect_bidirectional(proxy, sfo.clone(), las.clone(), 9);
 
@@ -277,10 +277,10 @@ fn dijkstra_is_cool() {
         let sfo = graph.node_by_name(SFO).unwrap();
         let path = graph.path_for(dtw.clone(), sfo.clone()).expect("was unable to find a path");
 
-        let ord = graph.node_by_name(ORD).unwrap();
+        let iah = graph.node_by_name(IAH).unwrap();
         let las = graph.node_by_name(LAS).unwrap();
 
-        let expected = [dtw, ord, las, sfo];
+        let expected = [dtw, iah, las, sfo];
         assert_eq!(&expected, &*path);
 
         let path_weight: u32 = path.iter()
@@ -289,6 +289,7 @@ fn dijkstra_is_cool() {
             .sum();
         assert_eq!(20, path_weight);
     }
+
 
     unimplemented!()
 }
