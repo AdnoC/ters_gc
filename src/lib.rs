@@ -2,24 +2,24 @@ enum Never {}
 
 mod allocator;
 mod reg_flush {
-    use ::Never;
-    extern {
-        pub(crate) fn flush_registers_and_call(callback: extern fn(*mut Never), data: *mut Never);
+    use Never;
+    extern "C" {
+        pub(crate) fn flush_registers_and_call(
+            callback: extern "C" fn(*mut Never),
+            data: *mut Never,
+        );
     }
 }
 
-
+use allocator::Allocator;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use allocator::Allocator;
 
 macro_rules! stack_ptr {
-    () => {
-        {
-            let a = 0usize; // usize so that it is aligned
-            (&a) as *const _ as *const ()
-        }
-    }
+    () => {{
+        let a = 0usize; // usize so that it is aligned
+        (&a) as *const _ as *const ()
+    }};
 }
 
 pub struct Collector {
@@ -70,10 +70,15 @@ impl Collector {
     }
 
     fn mark(&mut self) {
-        unsafe { ::reg_flush::flush_registers_and_call(Collector::mark_landingpad, self as *mut Collector as *mut _) };
+        unsafe {
+            ::reg_flush::flush_registers_and_call(
+                Collector::mark_landingpad,
+                self as *mut Collector as *mut _,
+            )
+        };
     }
 
-    extern fn mark_landingpad(data: *mut Never) {
+    extern "C" fn mark_landingpad(data: *mut Never) {
         let data = data as *mut Collector;
         let collector: &mut Collector = unsafe { &mut *data };
         let stack_top = stack_ptr!();
@@ -86,7 +91,7 @@ impl Collector {
 
     #[inline(never)]
     fn mark_stack(&mut self, stack_top: *const ()) {
-        use ::std::mem::size_of;
+        use std::mem::size_of;
 
         let top = stack_top as usize;
         let bottom = self.stack_bottom as usize;
@@ -163,9 +168,7 @@ impl Collector {
     // can't be moved while there is a reference to it)
     // FIXME: Make private
     fn proxy(&mut self) -> Proxy {
-        Proxy {
-            collector: self,
-        }
+        Proxy { collector: self }
     }
 
     fn update_collection_threshold(&mut self) {
@@ -232,7 +235,7 @@ mod tests {
     use super::*;
 
     struct LinkedList<'a> {
-        next: Option<Gc<'a, LinkedList<'a>>>
+        next: Option<Gc<'a, LinkedList<'a>>>,
     }
 
     fn num_tracked_objs(proxy: &Proxy) -> usize {
@@ -273,21 +276,15 @@ mod tests {
         assert!(threshold > num_useful);
 
         let body = |mut proxy: Proxy| {
-            let mut head = LinkedList {
-                next: None,
-            };
+            let mut head = LinkedList { next: None };
             macro_rules! prepend_ll {
-                () => {
-                    {
-                        let boxed = proxy.store(head);
-                        LinkedList {
-                            next: Some(boxed),
-                        }
-                    }
-                }
+                () => {{
+                    let boxed = proxy.store(head);
+                    LinkedList { next: Some(boxed) }
+                }};
             }
             for _ in 0..num_useful {
-                head = prepend_ll!();//(&mut proxy, head);
+                head = prepend_ll!(); //(&mut proxy, head);
             }
             eat_stack_and_exec(10, || {
                 for _ in 0..num_wasted {
@@ -295,7 +292,7 @@ mod tests {
                 }
             });
             assert_eq!(num_tracked_objs(&proxy), threshold);
-            head = prepend_ll!();//(&mut proxy, head);
+            head = prepend_ll!(); //(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
             assert!(head.next.is_some());
         };
@@ -311,21 +308,15 @@ mod tests {
         assert!(threshold > num_useful);
 
         let body = |mut proxy: Proxy| {
-            let mut head = LinkedList {
-                next: None,
-            };
+            let mut head = LinkedList { next: None };
             macro_rules! prepend_ll {
-                () => {
-                    {
-                        let boxed = proxy.store(head);
-                        LinkedList {
-                            next: Some(boxed),
-                        }
-                    }
-                }
+                () => {{
+                    let boxed = proxy.store(head);
+                    LinkedList { next: Some(boxed) }
+                }};
             }
             for _ in 0..num_useful {
-                head = prepend_ll!();//(&mut proxy, head);
+                head = prepend_ll!(); //(&mut proxy, head);
             }
             eat_stack_and_exec(10, || {
                 for _ in 0..num_wasted {
@@ -334,7 +325,7 @@ mod tests {
             });
             assert_eq!(num_tracked_objs(&proxy), threshold);
             proxy.pause();
-            prepend_ll!();//(&mut proxy, head);
+            prepend_ll!(); //(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), threshold + 1);
         };
         unsafe { col.run_with_gc(body) };
@@ -349,21 +340,15 @@ mod tests {
         assert!(threshold > num_useful);
 
         let body = |mut proxy: Proxy| {
-            let mut head = LinkedList {
-                next: None,
-            };
+            let mut head = LinkedList { next: None };
             macro_rules! prepend_ll {
-                () => {
-                    {
-                        let boxed = proxy.store(head);
-                        LinkedList {
-                            next: Some(boxed),
-                        }
-                    }
-                }
+                () => {{
+                    let boxed = proxy.store(head);
+                    LinkedList { next: Some(boxed) }
+                }};
             }
             for _ in 0..num_useful {
-                head = prepend_ll!();//(&mut proxy, head);
+                head = prepend_ll!(); //(&mut proxy, head);
             }
             eat_stack_and_exec(10, || {
                 for _ in 0..num_wasted {
@@ -373,7 +358,7 @@ mod tests {
             assert_eq!(num_tracked_objs(&proxy), threshold);
             proxy.pause();
             proxy.resume();
-            prepend_ll!();//(&mut proxy, head);
+            prepend_ll!(); //(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
         };
         unsafe { col.run_with_gc(body) };

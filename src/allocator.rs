@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ::Never;
+use Never;
 
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
@@ -34,12 +34,14 @@ impl AllocInfo {
     }
 
     pub fn inner_ptrs(&self) -> InnerObjectPtrs {
-        use ::std::mem::{ size_of, align_of };
+        use std::mem::{align_of, size_of};
         let aligned_ptr = round_up(self.ptr as usize, align_of::<usize>()) as *const _;
         let diff = aligned_ptr as usize - self.ptr as usize;
         let length = if self.size > diff {
             ((self.size - diff) / size_of::<usize>()) as isize
-        } else { 0 };
+        } else {
+            0
+        };
         InnerObjectPtrs {
             ptr: aligned_ptr,
             idx: 0,
@@ -66,7 +68,7 @@ impl Iterator for InnerObjectPtrs {
         if self.idx >= self.length {
             return None;
         }
-        
+
         self.idx += 1;
 
         Some(unsafe { self.ptr.offset(self.idx - 1) })
@@ -101,7 +103,7 @@ impl Allocator {
         self.items.remove(&(ptr as *const _)); // Will be deallocated by Drop
     }
     pub fn _remove<T>(&mut self, ptr: *const T) -> T {
-        use ::std::mem::forget;
+        use std::mem::forget;
         let item = self.items.remove(&(ptr as *const _));
         forget(item);
         let boxed = unsafe { Box::from_raw(ptr as *mut _) };
@@ -137,7 +139,9 @@ fn store_single_value<T>(value: T) -> *const T {
 }
 
 fn get_rebox<T>() -> fn(*const Never) {
-    |ptr: *const Never| unsafe { Box::<T>::from_raw(ptr as *const _ as *mut _); }
+    |ptr: *const Never| unsafe {
+        Box::<T>::from_raw(ptr as *const _ as *mut _);
+    }
 }
 
 #[inline]
@@ -148,10 +152,7 @@ fn round_up(base: usize, align: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        rc::Rc,
-        cell::RefCell,
-    };
+    use std::{cell::RefCell, rc::Rc};
 
     struct DtorCounter {
         inner: Rc<RefCell<DtorCounterInner>>,
@@ -195,12 +196,13 @@ mod tests {
     }
     impl Drop for CounterIncrementer {
         fn drop(&mut self) {
-            if self.ran_dtor { return; }
+            if self.ran_dtor {
+                return;
+            }
             self.ran_dtor = true;
 
             let mut counter_ref = self.counter.borrow_mut();
             counter_ref.num_run += 1;
-
         }
     }
 

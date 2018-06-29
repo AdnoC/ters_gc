@@ -1,38 +1,46 @@
-extern crate terse;
-extern crate smallvec;
 extern crate priority_queue;
+extern crate smallvec;
+extern crate terse;
 
 use priority_queue::PriorityQueue;
 use smallvec::SmallVec;
-use terse::*;
 use std::cell::RefCell;
-use std::fmt;
-use std::ops::Deref;
-use std::cmp::{PartialEq, Eq};
+use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
+use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
+use terse::*;
 
 // NOTE: Might have problems with SmallVec not clearing values of `remove`d entries
-
 
 type GcNode<'a> = PrintWrapper<Gc<'a, Node<'a>>>;
 type GcEdge<'a> = PrintWrapper<Gc<'a, Edge<'a>>>;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct PrintWrapper<P>
-where P: Deref, <P as Deref>::Target: fmt::Debug {
-    ptr: P
+where
+    P: Deref,
+    <P as Deref>::Target: fmt::Debug,
+{
+    ptr: P,
 }
 
-impl<P> fmt::Debug for PrintWrapper<P> 
-    where P: Deref, <P as Deref>::Target: fmt::Debug {
+impl<P> fmt::Debug for PrintWrapper<P>
+where
+    P: Deref,
+    <P as Deref>::Target: fmt::Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", &*self.ptr)
     }
 }
 
 impl<P> Deref for PrintWrapper<P>
-    where P: Deref, <P as Deref>::Target: fmt::Debug {
+where
+    P: Deref,
+    <P as Deref>::Target: fmt::Debug,
+{
     type Target = <P as Deref>::Target;
 
     fn deref(&self) -> &Self::Target {
@@ -65,7 +73,9 @@ impl<'a> Graph<'a> {
             adjacencies: RefCell::new(SmallVec::new()),
             name,
         };
-        let node = PrintWrapper{ptr: proxy.store(node)};
+        let node = PrintWrapper {
+            ptr: proxy.store(node),
+        };
         self.nodes.push(node.clone());
         node
     }
@@ -74,7 +84,11 @@ impl<'a> Graph<'a> {
     // Since we are using a GC its fine if references to it exist outside of us.
     fn remove_node_by_name(&mut self, name: &str) -> Option<GcNode<'a>> {
         for node in &self.nodes {
-            let idx = node.adjacencies.borrow().iter().position(|edge| edge.dest.name == name);
+            let idx = node
+                .adjacencies
+                .borrow()
+                .iter()
+                .position(|edge| edge.dest.name == name);
             if let Some(idx) = idx {
                 node.adjacencies.borrow_mut().remove(idx);
             }
@@ -86,7 +100,6 @@ impl<'a> Graph<'a> {
     fn node_by_name(&self, name: &str) -> Option<GcNode<'a>> {
         self.nodes.iter().find(|node| node.name == name).cloned()
     }
-
 
     fn path_for(&self, src: GcNode<'a>, dest: GcNode<'a>) -> Option<SmallVec<[GcNode<'a>; 16]>> {
         // Want lower distance -> higher priority
@@ -101,13 +114,17 @@ impl<'a> Graph<'a> {
         // So, its fine to store the nodes on the heap.
         //
         // Also, all the nodes are stored in the Graph, which is a root.
-        let mut distances: HashMap<GcNode<'a>, u64> = self.nodes.iter()
+        let mut distances: HashMap<GcNode<'a>, u64> = self
+            .nodes
+            .iter()
             .cloned()
             .map(|node| (node, std::u64::MAX))
             .collect();
         *distances.get_mut(&src).unwrap() = 0;
         let mut prev_in_path: HashMap<GcNode<'a>, GcNode<'a>> = HashMap::new();
-        let mut nodes_to_process: PriorityQueue<GcNode<'a>, u64> = self.nodes.iter()
+        let mut nodes_to_process: PriorityQueue<GcNode<'a>, u64> = self
+            .nodes
+            .iter()
             .cloned()
             .map(|node| {
                 let dist = distances[&node];
@@ -158,19 +175,27 @@ struct Node<'a> {
 impl<'a> Node<'a> {
     fn connect_to(&self, proxy: &mut Proxy<'a>, dest: GcNode<'a>, weight: u32) {
         assert!(self.adjacencies.borrow().len() < self.adjacencies.borrow().inline_size() - 1);
-        let edge = PrintWrapper { ptr: proxy.store(Edge { dest, weight }) };
+        let edge = PrintWrapper {
+            ptr: proxy.store(Edge { dest, weight }),
+        };
         self.adjacencies.borrow_mut().push(edge);
     }
 
     fn disconnect_from(&self, dest: GcNode<'a>) {
-        let idx = self.adjacencies.borrow().iter().position(|edge| edge.dest.name == dest.name);
+        let idx = self
+            .adjacencies
+            .borrow()
+            .iter()
+            .position(|edge| edge.dest.name == dest.name);
         if let Some(idx) = idx {
             self.adjacencies.borrow_mut().remove(idx);
         }
     }
 
     fn weight_to(&self, dest: GcNode<'a>) -> Option<u32> {
-        self.adjacencies.borrow().iter()
+        self.adjacencies
+            .borrow()
+            .iter()
             .find(|edge| edge.dest == dest)
             .map(|edge| edge.weight)
     }
@@ -183,7 +208,12 @@ fn connect_bidirectional<'a>(proxy: &mut Proxy<'a>, a: GcNode<'a>, b: GcNode<'a>
 
 impl<'a> fmt::Debug for Node<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Node {{ name: {}, adjacencies: {:#?} }}", self.name, self.adjacencies.borrow())
+        write!(
+            f,
+            "Node {{ name: {}, adjacencies: {:#?} }}",
+            self.name,
+            self.adjacencies.borrow()
+        )
     }
 }
 
@@ -200,7 +230,6 @@ impl<'a> Hash for Node<'a> {
     }
 }
 
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct Edge<'a> {
     dest: GcNode<'a>,
@@ -208,7 +237,11 @@ struct Edge<'a> {
 }
 impl<'a> fmt::Debug for Edge<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Edge {{ name: {}, weight: {} }}", self.dest.name, self.weight)
+        write!(
+            f,
+            "Edge {{ name: {}, weight: {} }}",
+            self.dest.name, self.weight
+        )
     }
 }
 
@@ -282,7 +315,9 @@ fn dijkstra_is_cool() {
     };
 
     let mut col = Collector::new();
-    unsafe { col.run_with_gc(body); }
+    unsafe {
+        col.run_with_gc(body);
+    }
 
     fn initialize_graph<'a>(proxy: &mut Proxy<'a>, graph: &mut Graph<'a>) {
         let dtw = graph.new_node(proxy, DTW);
@@ -314,7 +349,9 @@ fn dijkstra_is_cool() {
     fn test_first_path<'a>(graph: &Graph<'a>) {
         let dtw = graph.node_by_name(DTW).unwrap();
         let sfo = graph.node_by_name(SFO).unwrap();
-        let path = graph.path_for(dtw.clone(), sfo.clone()).expect("was unable to find a path");
+        let path = graph
+            .path_for(dtw.clone(), sfo.clone())
+            .expect("was unable to find a path");
 
         let iah = graph.node_by_name(IAH).unwrap();
         let las = graph.node_by_name(LAS).unwrap();
@@ -322,7 +359,8 @@ fn dijkstra_is_cool() {
         let expected = [dtw, iah, las, sfo];
         assert_eq!(&expected, &*path);
 
-        let path_weight: u32 = path.iter()
+        let path_weight: u32 = path
+            .iter()
             .zip(path.iter().skip(1).cloned())
             .map(|(src, dst)| src.weight_to(dst).unwrap())
             .sum();
@@ -373,8 +411,11 @@ fn dijkstra_is_cool() {
     fn test_second_path<'a>(graph: &Graph<'a>) {
         let dtw = graph.node_by_name(DTW).unwrap();
         let sfo = graph.node_by_name(SFO).unwrap();
-        let path = graph.path_for(dtw.clone(), sfo.clone()).expect("was unable to find a path");
-        let path_weight: u32 = path.iter()
+        let path = graph
+            .path_for(dtw.clone(), sfo.clone())
+            .expect("was unable to find a path");
+        let path_weight: u32 = path
+            .iter()
             .zip(path.iter().skip(1).cloned())
             .map(|(src, dst)| src.weight_to(dst).unwrap())
             .sum();
