@@ -99,24 +99,32 @@ impl<T> TrackingRef<T> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct GcPtr<T> {
+    ptr: *const GcBox<T>,// TODO Make NonNull<GcBox<T>>
+    magic: usize,
+}
 #[derive(Clone, Copy, PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
 pub struct Gc<'arena, T> {
     _marker: PhantomData<*const &'arena ()>,
-    ptr: *const GcBox<T>, // TODO Make NonNull<GcBox<T>>
+    ptr: GcPtr<T>,
 }
 
 impl<'a, T> Gc<'a, T> {
-
-    pub(crate) fn from_raw<'b>(_marker: PhantomData<*const &'b ()>, ptr: *const GcBox<T>) -> Gc<'b, T> {
+    pub(crate) fn from_raw<'b>(ptr: *const GcBox<T>, magic: usize, _marker: PhantomData<*const &'b ()>) -> Gc<'b, T> {
         Gc {
             _marker,
-            ptr,
+            ptr: GcPtr {
+                ptr,
+                magic,
+            },
         }
     }
+
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {
             _marker: PhantomData,
-            weak_ptr: unsafe { (*this.ptr).tracking_ref() },
+            weak_ptr: unsafe { (*this.ptr.ptr).tracking_ref() },
         }
     }
     pub fn safe(this: &Gc<'a, T>) -> Safe<'a, T> {
@@ -127,7 +135,7 @@ impl<'a, T> Deref for Gc<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { (*self.ptr).borrow() }
+        unsafe { (*self.ptr.ptr).borrow() }
     }
 }
 

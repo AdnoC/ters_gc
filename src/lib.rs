@@ -24,6 +24,8 @@ macro_rules! stack_ptr {
     }};
 }
 
+const MAGIC: usize = 0x3d4a825;
+
 pub struct Collector {
     allocator: Allocator,
     collection_threshold: usize,
@@ -31,6 +33,7 @@ pub struct Collector {
     sweep_factor: f64,
     paused: bool,
     stack_bottom: *const (),
+    magic: usize,
 }
 
 impl Collector {
@@ -42,6 +45,7 @@ impl Collector {
             sweep_factor: 0.5,
             paused: false,
             stack_bottom: 0 as *const (),
+            magic: MAGIC, // TODO: Make random
         }
     }
 
@@ -192,7 +196,7 @@ pub struct Proxy<'arena> {
 impl<'a> Proxy<'a> {
     pub fn store<T>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
-        Gc::from_raw(PhantomData, ptr)
+        Gc::from_raw(ptr, self.collector.magic, PhantomData)
     }
 
     pub fn run(&mut self) {
