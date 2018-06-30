@@ -1,6 +1,7 @@
-enum Never {}
+enum Never {} // TODO Make NonNull<GcBox<T>>
 
 mod allocator;
+mod ptr;
 mod reg_flush {
     use Never;
     extern "C" {
@@ -11,9 +12,10 @@ mod reg_flush {
     }
 }
 
+pub use ptr::Gc;
+use ptr::GcBox;
 use allocator::Allocator;
 use std::marker::PhantomData;
-use std::ops::Deref;
 
 macro_rules! stack_ptr {
     () => {{
@@ -56,7 +58,7 @@ impl Collector {
         func(proxy)
     }
 
-    fn alloc<T>(&mut self, val: T) -> *const T {
+    fn alloc<T>(&mut self, val: T) -> *const GcBox<T> {
         let ptr = self.allocator.alloc(val);
         if self.should_collect() {
             self.run();
@@ -190,10 +192,7 @@ pub struct Proxy<'arena> {
 impl<'a> Proxy<'a> {
     pub fn store<T>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
-        Gc {
-            _marker: PhantomData,
-            ptr,
-        }
+        Gc::from_raw(PhantomData, ptr)
     }
 
     pub fn run(&mut self) {
@@ -216,19 +215,6 @@ impl<'a> Proxy<'a> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
-pub struct Gc<'arena, T> {
-    _marker: PhantomData<*const &'arena ()>,
-    ptr: *const T,
-}
-
-impl<'a, T> Deref for Gc<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.ptr }
-    }
-}
 
 #[cfg(test)]
 mod tests {
