@@ -1,3 +1,4 @@
+#include <string.h>
 #include <setjmp.h>
 
 typedef void (*callback_func)(void *);
