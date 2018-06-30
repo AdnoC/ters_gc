@@ -140,6 +140,8 @@ fn store_single_value<T>(value: T) -> *const T {
 
 fn get_rebox<T>() -> fn(*const Never) {
     |ptr: *const Never| unsafe {
+        // Should be safe to cast to mut, as this is only used for destruction.
+        // There shouldn't be any other active pointers to the object.
         Box::<T>::from_raw(ptr as *const _ as *mut _);
     }
 }
