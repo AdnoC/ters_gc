@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::cell::Cell;
 pub(crate) struct GcBox<T> {
     val: T,
+    refs: Cell<usize>,
     coroner: Coroner<T>,
 }
 
@@ -12,8 +13,15 @@ impl<T> GcBox<T> {
     pub fn new(val: T) -> GcBox<T> {
         GcBox {
             val,
+            refs: Cell::new(0),
             coroner: Coroner::new(),
         }
+    }
+    pub fn incr_ref(&self) {
+        self.refs.set(self.refs.get() + 1);
+    }
+    pub fn decr_ref(&self) {
+        self.refs.set(self.refs.get() - 1);
     }
     pub fn borrow(&self) -> &T {
         &self.val
@@ -104,7 +112,7 @@ pub struct GcPtr<T> {
     ptr: *const GcBox<T>,// TODO Make NonNull<GcBox<T>>
     magic: usize,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
+#[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
 pub struct Gc<'arena, T> {
     _marker: PhantomData<*const &'arena ()>,
     ptr: GcPtr<T>,
@@ -112,19 +120,24 @@ pub struct Gc<'arena, T> {
 
 impl<'a, T> Gc<'a, T> {
     pub(crate) fn from_raw<'b>(ptr: *const GcBox<T>, magic: usize, _marker: PhantomData<*const &'b ()>) -> Gc<'b, T> {
-        Gc {
+        let gc = Gc {
             _marker,
             ptr: GcPtr {
                 ptr,
                 magic,
             },
-        }
+        };
+        Gc::get_gc_box(&gc).incr_ref();
+        gc
     }
 
+    fn get_gc_box<'b>(this: &'b Gc<'a, T>) -> &'b GcBox<T> {
+        unsafe { &*this.ptr.ptr }
+    }
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {
             _marker: PhantomData,
-            weak_ptr: unsafe { (*this.ptr.ptr).tracking_ref() },
+            weak_ptr: Gc::get_gc_box(this).tracking_ref(),
         }
     }
     pub fn safe(this: &Gc<'a, T>) -> Safe<'a, T> {
@@ -135,7 +148,25 @@ impl<'a, T> Deref for Gc<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { (*self.ptr.ptr).borrow() }
+        Gc::get_gc_box(self).borrow()
+    }
+}
+impl<'a, T> Drop for Gc<'a, T> {
+    fn drop(&mut self) {
+        Gc::get_gc_box(self).decr_ref();
+    }
+}
+impl<'a, T> Clone for Gc<'a, T> {
+    fn clone(&self) -> Self {
+        let gc = Gc {
+            _marker: PhantomData,
+            ptr: GcPtr {
+                ptr: self.ptr.ptr,
+                magic: self.ptr.magic,
+            },
+        };
+        Gc::get_gc_box(&gc).incr_ref();
+        gc
     }
 }
 
@@ -163,3 +194,26 @@ impl<'a, T> Safe<'a, T> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ::*;
+    #[test]
+    fn ref_count_works() {
+        use std::mem::drop;
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            fn get_ref_num<'a, T>(gc: &Gc<'a, T>) -> usize {
+                Gc::get_gc_box(gc).refs.clone().take()
+            }
+            let num = proxy.store(42);
+            assert_eq!(get_ref_num(&num), 1);
+            let num2 = num.clone();
+            assert_eq!(get_ref_num(&num), 2);
+            drop(num);
+            assert_eq!(get_ref_num(&num2), 1);
+
+        };
+        unsafe { col.run_with_gc(body) };
+    }
+}
