@@ -32,7 +32,9 @@ where
     <P as Deref>::Target: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", &*self.ptr)
+        f.debug_struct("PrintWrapp")
+            .field("ptr", &&*self.ptr)
+            .finish()
     }
 }
 
@@ -208,12 +210,20 @@ fn connect_bidirectional<'a>(proxy: &mut Proxy<'a>, a: GcNode<'a>, b: GcNode<'a>
 
 impl<'a> fmt::Debug for Node<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Node {{ name: {}, adjacencies: {:#?} }}",
-            self.name,
-            self.adjacencies.borrow()
-        )
+        struct AdjWrapper<'b, 'a: 'b>(&'b RefCell<SmallVec<[GcEdge<'a>; 16]>>);
+        impl<'a, 'b> fmt::Debug for AdjWrapper<'a, 'b> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.debug_list()
+                    .entries(self.0.borrow().iter())
+                    .finish()
+            }
+        }
+        let adj = AdjWrapper(&self.adjacencies);
+        f.debug_struct("Node")
+            .field("name", &self.name)
+            .field("num_adjacencies", &self.adjacencies.borrow().len())
+            .field("adjacencies", &adj)
+            .finish()
     }
 }
 
@@ -237,11 +247,10 @@ struct Edge<'a> {
 }
 impl<'a> fmt::Debug for Edge<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Edge {{ name: {}, weight: {} }}",
-            self.dest.name, self.weight
-        )
+        f.debug_struct("Edge")
+            .field("dest_name", &self.dest.name)
+            .field("weight", &self.weight)
+            .finish()
     }
 }
 
