@@ -148,7 +148,7 @@ impl<'a, T> Gc<'a, T> {
     }
     pub fn to_safe(this: Gc<'a, T>) -> Safe<'a, T> {
         Safe {
-            _gc_marker: this.clone(),
+            _gc_marker: Some(this.clone()),
             ptr: Gc::downgrade(&this),
         }
     }
@@ -196,6 +196,9 @@ impl<'a, T> Weak<'a, T> {
 
     }
 
+    pub fn is_alive(&self) -> bool {
+        self.weak_ptr.is_alive()
+    }
     pub fn get(&self) -> Option<&T> {
         self.weak_ptr.get()
             .map(|gc_box| unsafe {  (*gc_box).borrow() })
@@ -204,15 +207,33 @@ impl<'a, T> Weak<'a, T> {
 
 #[derive(Clone)]
 pub struct Safe<'arena, T> {
-    _gc_marker: Gc<'arena, T>,
+    _gc_marker: Option<Gc<'arena, T>>,
     ptr: Weak<'arena, T>,
 }
 impl<'a, T> Safe<'a, T> {
-    pub fn to_unsafe(this: Safe<'a, T>) -> Gc<'a, T> {
-        this._gc_marker
+    pub fn to_unsafe(mut this: Safe<'a, T>) -> Gc<'a, T> {
+        use std::mem::replace;
+        let gc = replace(&mut this._gc_marker, None);
+        gc.unwrap()
     }
     pub fn get(&self) -> Option<&T> {
         self.ptr.get()
+    }
+    pub fn is_alive(&self) -> bool {
+        self.ptr.is_alive()
+    }
+}
+impl<'a, T> Drop for Safe<'a, T> {
+    fn drop(&mut self) {
+        use std::mem::{replace, forget};
+        println!("self living = {}", self.is_alive());
+        if !self.is_alive() {
+            println!("swapping");
+            let gc = replace(&mut self._gc_marker, None);
+            println!("swapped");
+            forget(gc);
+            println!("forget gc");
+        }
     }
 }
 
@@ -220,6 +241,16 @@ impl<'a, T> Safe<'a, T> {
 mod tests {
     use super::*;
     use ::*;
+
+    #[inline(never)]
+    fn eat_stack_and_exec<T, F: FnOnce() -> T>(recurs: usize, callback: F) -> T{
+        let _nom = [22; 25];
+        if recurs > 0 {
+            eat_stack_and_exec(recurs - 1, callback)
+        } else {
+            callback()
+        }
+    }
     #[test]
     fn ref_count_works() {
         use std::mem::drop;
@@ -258,6 +289,43 @@ mod tests {
             }
             let num = Gc::from_safe(num_safe);
             assert_eq!(num.get(), 3);
+        };
+
+        unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn weak_knows_when_dangling() {
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            let num_weak = eat_stack_and_exec(10, || {
+                let num = proxy.store(Cell::new(0));
+                let num_weak = Gc::downgrade(&num);
+                num_weak
+            });
+            proxy.run();
+            assert_eq!(proxy.num_tracked(), 0);
+            assert!(num_weak.get().is_none());
+        };
+
+        unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn safe_knows_when_dangling() {
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            let num_safe = eat_stack_and_exec(10, || {
+                let num = proxy.store(Cell::new(0));
+                Gc::get_gc_box(&num).decr_ref();
+                let num_safe = Gc::to_safe(num);
+                num_safe
+            });
+
+
+            proxy.run();
+            assert_eq!(proxy.num_tracked(), 0);
+            assert!(num_safe.get().is_none());
         };
 
         unsafe { col.run_with_gc(body) };
