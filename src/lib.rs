@@ -168,8 +168,9 @@ impl Collector {
 
         if let Some(children) = children {
             for val in children {
+                let val = val as *const *const Never;
                 let val = unsafe { *val };
-                if let Some(child) = self.allocator.info_for_ptr_mut(ptr) {
+                if let Some(child) = self.allocator.info_for_ptr_mut(val) {
                     child.mark_isolated();
                 }
             }
