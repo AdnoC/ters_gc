@@ -23,6 +23,9 @@ impl<T> GcBox<T> {
     pub fn decr_ref(&self) {
         self.refs.set(self.refs.get() - 1);
     }
+    pub fn ref_count(&self) -> usize {
+        self.refs.get()
+    }
     pub fn borrow(&self) -> &T {
         &self.val
     }
@@ -133,6 +136,9 @@ impl<'a, T> Gc<'a, T> {
 
     fn get_gc_box<'b>(this: &'b Gc<'a, T>) -> &'b GcBox<T> {
         unsafe { &*this.ptr.ptr }
+    }
+    pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
+        Gc::get_gc_box(this).ref_count()
     }
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {

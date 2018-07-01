@@ -15,6 +15,7 @@ mod reg_flush {
 pub use ptr::Gc;
 use ptr::GcBox;
 use allocator::Allocator;
+use allocator::AllocInfo;
 use std::marker::PhantomData;
 
 macro_rules! stack_ptr {
@@ -63,10 +64,10 @@ impl Collector {
     }
 
     fn alloc<T>(&mut self, val: T) -> *const GcBox<T> {
-        let ptr = self.allocator.alloc(val);
         if self.should_collect() {
             self.run();
         }
+        let ptr = self.allocator.alloc(val);
         ptr
     }
 
@@ -93,6 +94,19 @@ impl Collector {
 
     fn mark_impl(&mut self, stack_top: *const ()) {
         self.mark_stack(stack_top);
+        self.mark_in_gc();
+    }
+
+    fn mark_in_gc(&mut self) {
+        let mut unmarked_objects = vec![];
+        for info in self.allocator.items.values() {
+            if !info.is_marked_reachable() {
+                unmarked_objects.push(info.ptr);
+            }
+        }
+        for ptr in unmarked_objects.into_iter() {
+            self.mark_island_ptr(ptr);
+        }
     }
 
     #[inline(never)]
@@ -114,11 +128,11 @@ impl Collector {
         for addr in (bottom..top).step_by(size_of::<usize>()) {
             let stack_ptr = addr as *const *const Never;
             let stack_value = unsafe { *stack_ptr };
-            self.mark_ptr(stack_value);
+            self.mark_ptr(stack_value, true);
         }
     }
 
-    fn mark_ptr(&mut self, ptr: *const Never) {
+    fn mark_ptr(&mut self, ptr: *const Never, root: bool) {
         if !self.allocator.is_ptr_in_range(ptr) {
             return;
         }
@@ -126,31 +140,81 @@ impl Collector {
         let mut children = None;
         if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
             if !info.is_marked_reachable() {
-                info.mark();
                 children = Some(info.inner_ptrs());
+            }
+            if root {
+                info.mark_root();
+            } else {
+                info.mark_branch();
             }
         }
 
         if let Some(children) = children {
             for val in children {
                 let val = unsafe { *val };
-                self.mark_ptr(val as *const Never);
+                self.mark_ptr(val as *const Never, false);
             }
+        }
+    }
+
+    // ptr MUST be a valid tracked object
+    fn mark_island_ptr(&mut self, ptr: *const Never) {
+        assert!(self.allocator.is_ptr_in_range(ptr));
+
+        let mut children = None;
+        if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
+            children = Some(info.inner_ptrs());
+        }
+
+        if let Some(children) = children {
+            for val in children {
+                let val = unsafe { *val };
+                if let Some(child) = self.allocator.info_for_ptr_mut(ptr) {
+                    child.mark_isolated();
+                }
+            }
+        }
+    }
+
+    fn is_object_reachable(info: &AllocInfo) -> bool {
+        let stack_refs = info.root_marks();
+        let refs_in_gc = info.branch_marks();
+        let isolated_refs = info.isolated_marks();
+        let known_refs = stack_refs + refs_in_gc + isolated_refs;
+        let total_refs = info.ref_count();
+        // assert!(stack_refs + refs_in_gc <= total_refs,
+        //         "Found more references to object than were made.
+        //          total: {}, stack: {}, in_gc_heap: {}, ptr: {}", total_refs, stack_refs, refs_in_gc, info.ptr as usize);
+
+        // Don't actually do the subtraction, since it will underflow if
+        // zombie values of an address are found on the stack.
+        // let heap_refs = total_refs - stack_refs - refs_in_gc;
+        // If we know it is reachable or the only refs are hidden in the heap
+        println!("stack {}, in_gc {}, isolated {}, total {}", stack_refs, refs_in_gc, isolated_refs, total_refs);
+        if total_refs == isolated_refs {
+            false
+        } else {
+            info.is_marked_reachable() || total_refs > known_refs
         }
     }
 
     fn sweep(&mut self) {
         let mut unreachable_objects = vec![];
         for info in self.allocator.items.values_mut() {
-            if !info.is_marked_reachable() {
+            if !Self::is_object_reachable(info) {
+                println!("not reachable");
                 unreachable_objects.push(info.ptr);
             } else {
+                println!("reachable");
                 info.unmark();
             }
         }
 
+        println!("Freeing {} ptrs", unreachable_objects.len() );
         for ptr in unreachable_objects.into_iter() {
+            println!("Have {}, freeing {}", self.allocator.items.len(), ptr as usize);
             self.allocator.free(ptr);
+            println!("After {}, ", self.allocator.items.len());
         }
 
         self.update_collection_threshold();
@@ -185,7 +249,7 @@ impl Collector {
 
     fn should_collect(&self) -> bool {
         let num_tracked = self.num_tracked();
-        !self.paused && num_tracked > self.collection_threshold
+        !self.paused && num_tracked >= self.collection_threshold
     }
 }
 
@@ -276,7 +340,7 @@ mod tests {
             for _ in 0..num_useful {
                 head = prepend_ll!(); //(&mut proxy, head);
             }
-            eat_stack_and_exec(10, || {
+             eat_stack_and_exec(10, ||  {
                 for _ in 0..num_wasted {
                     proxy.store(22);
                 }
@@ -359,5 +423,28 @@ mod tests {
         let mut col = Collector::new();
         let val = unsafe { col.run_with_gc(|_proxy| 42) };
         assert_eq!(val, 42);
+    }
+
+    #[test]
+    fn self_ref_cycle() {
+        use std::cell::Cell;
+        struct SelfRef<'a> {
+            self_ptr: Cell<Option<Gc<'a, SelfRef<'a>>>>
+        }
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            eat_stack_and_exec(6, || {
+                let ptr = proxy.store(SelfRef {
+                    self_ptr: Cell::new(None),
+                });
+                ptr.self_ptr.set(Some(ptr.clone()));
+            });
+
+            println!("Running gc");
+            proxy.run();
+            assert_eq!(num_tracked_objs(&proxy), 0);
+        };
+
+        unsafe { col.run_with_gc(body) };
     }
 }

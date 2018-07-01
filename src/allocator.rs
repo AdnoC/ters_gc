@@ -9,7 +9,10 @@ use Never;
 pub(crate) struct AllocInfo {
     pub ptr: *const Never,
     rebox: fn(*const Never),
-    marked: bool,
+    branches: usize, // # of marks from ptrs stored in tracked objects
+    roots: usize, // # of marks from ptrs stored in stack (since we can't traverse heap)
+    isolated: usize, // # of marks from objects for which is_marked_reachable == false
+    refs: fn(*const Never) -> usize,
     size: usize,
 }
 
@@ -19,21 +22,50 @@ impl AllocInfo {
         AllocInfo {
             ptr: store_single_value(value) as *const _,
             rebox: get_rebox::<T>(),
-            marked: false,
+            branches: 0,
+            roots: 0,
+            isolated: 0,
+            refs: get_refs_accessor::<T>(),
             size: size_of::<T>(),
         }
     }
 
-    pub fn mark(&mut self) {
-        self.marked = true;
+    pub fn mark_branch(&mut self) {
+        println!("branch {}", self.ptr as usize);
+        self.branches += 1;
+    }
+    pub fn mark_root(&mut self) {
+        println!("root {}", self.ptr as usize);
+        self.roots += 1;
+    }
+    pub fn mark_isolated(&mut self) {
+        self.isolated += 1;
     }
 
     pub fn unmark(&mut self) {
-        self.marked = false;
+        self.branches = 0;
+        self.roots = 0;
+        self.isolated = 0;
     }
 
     pub fn is_marked_reachable(&self) -> bool {
-        self.marked
+        self.branches > 0 || self.roots > 0
+    }
+
+    pub fn root_marks(&self) -> usize {
+        self.roots
+    }
+
+    pub fn branch_marks(&self) -> usize {
+        self.branches
+    }
+
+    pub fn isolated_marks(&self) -> usize {
+        self.isolated
+    }
+
+    pub fn ref_count(&self) -> usize {
+        (self.refs)(self.ptr)
     }
 
     pub fn inner_ptrs(&self) -> InnerObjectPtrs {
@@ -146,6 +178,13 @@ fn get_rebox<T>() -> fn(*const Never) {
         // Should be safe to cast to mut, as this is only used for destruction.
         // There shouldn't be any other active pointers to the object.
         Box::<GcBox<T>>::from_raw(ptr as *const _ as *mut _);
+    }
+}
+
+fn get_refs_accessor<T>() -> fn(*const Never) -> usize {
+    |ptr: *const Never| unsafe {
+        let gc_box = &*(ptr as *const GcBox<T>);
+        gc_box.ref_count()
     }
 }
 
