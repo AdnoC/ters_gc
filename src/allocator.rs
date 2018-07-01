@@ -194,6 +194,8 @@ fn round_up(base: usize, align: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::rc::Rc;
+    use std::cell::RefCell;
 
     struct DtorCounter {
         inner: Rc<RefCell<DtorCounterInner>>,

@@ -146,8 +146,15 @@ impl<'a, T> Gc<'a, T> {
             weak_ptr: Gc::get_gc_box(this).tracking_ref(),
         }
     }
-    pub fn safe(this: &Gc<'a, T>) -> Safe<'a, T> {
-        unimplemented!()
+    pub fn to_safe(this: Gc<'a, T>) -> Safe<'a, T> {
+        Safe {
+            _gc_marker: this.clone(),
+            ptr: Gc::downgrade(&this),
+        }
+    }
+
+    pub fn from_safe(this: Safe<'a, T>) -> Gc<'a, T> {
+        Safe::to_unsafe(this)
     }
 }
 impl<'a, T> Deref for Gc<'a, T> {
@@ -183,6 +190,12 @@ pub struct Weak<'arena, T> {
 }
 
 impl<'a, T> Weak<'a, T> {
+    pub fn upgrade(&self) -> Option<Gc<'a, T>> {
+        self.weak_ptr.get()
+            .map(|gc_box| Gc::from_raw(gc_box, 0, PhantomData))
+
+    }
+
     pub fn get(&self) -> Option<&T> {
         self.weak_ptr.get()
             .map(|gc_box| unsafe {  (*gc_box).borrow() })
@@ -195,6 +208,9 @@ pub struct Safe<'arena, T> {
     ptr: Weak<'arena, T>,
 }
 impl<'a, T> Safe<'a, T> {
+    pub fn to_unsafe(this: Safe<'a, T>) -> Gc<'a, T> {
+        this._gc_marker
+    }
     pub fn get(&self) -> Option<&T> {
         self.ptr.get()
     }
@@ -220,6 +236,30 @@ mod tests {
             assert_eq!(get_ref_num(&num2), 1);
 
         };
+        unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn casting_safe_and_weak() {
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            let num = proxy.store(Cell::new(0));
+            let num_weak = Gc::downgrade(&num);
+            {
+                let num_ref = num_weak.get().unwrap();
+                num_ref.set(num_ref.get() + 1);
+            }
+            let num = num_weak.upgrade().unwrap();
+            num.set(num.get() + 1);
+            let num_safe = Gc::to_safe(num);
+            {
+                let num_ref = num_weak.get().unwrap();
+                num_ref.set(num_ref.get() + 1);
+            }
+            let num = Gc::from_safe(num_safe);
+            assert_eq!(num.get(), 3);
+        };
+
         unsafe { col.run_with_gc(body) };
     }
 }
