@@ -191,7 +191,6 @@ impl Collector {
         // zombie values of an address are found on the stack.
         // let heap_refs = total_refs - stack_refs - refs_in_gc;
         // If we know it is reachable or the only refs are hidden in the heap
-        println!("stack {}, in_gc {}, isolated {}, total {}", stack_refs, refs_in_gc, isolated_refs, total_refs);
         if total_refs == isolated_refs {
             false
         } else {
@@ -203,19 +202,14 @@ impl Collector {
         let mut unreachable_objects = vec![];
         for info in self.allocator.items.values_mut() {
             if !Self::is_object_reachable(info) {
-                println!("not reachable");
                 unreachable_objects.push(info.ptr);
             } else {
-                println!("reachable");
                 info.unmark();
             }
         }
 
-        println!("Freeing {} ptrs", unreachable_objects.len() );
         for ptr in unreachable_objects.into_iter() {
-            println!("Have {}, freeing {}", self.allocator.items.len(), ptr as usize);
             self.allocator.free(ptr);
-            println!("After {}, ", self.allocator.items.len());
         }
 
         self.update_collection_threshold();
@@ -441,7 +435,6 @@ mod tests {
                 ptr.self_ptr.set(Some(ptr.clone()));
             });
 
-            println!("Running gc");
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 0);
         };

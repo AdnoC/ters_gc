@@ -29,11 +29,9 @@ impl AllocInfo {
     }
 
     pub fn mark_branch(&mut self) {
-        println!("branch {}", self.ptr as usize);
         self.branches += 1;
     }
     pub fn mark_root(&mut self) {
-        println!("root {}", self.ptr as usize);
         self.roots += 1;
     }
     pub fn mark_isolated(&mut self) {
