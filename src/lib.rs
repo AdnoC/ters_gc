@@ -291,14 +291,13 @@ mod tests {
         proxy.num_tracked()
     }
     #[inline(never)]
-    fn eat_stack_and_exec<F: FnOnce()>(recurs: usize, callback: F) {
+    fn eat_stack_and_exec<T, F: FnOnce() -> T>(recurs: usize, callback: F) -> T {
         let _nom = [22; 25];
         if recurs > 0 {
-            eat_stack_and_exec(recurs - 1, callback);
-            return;
+            eat_stack_and_exec(recurs - 1, callback)
+        } else {
+            callback()
         }
-
-        callback();
     }
     #[test]
     fn msc_allocs_sanity_check() {
@@ -437,6 +436,32 @@ mod tests {
 
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 0);
+        };
+
+        unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn pointed_to_by_heap_root_arent_freed() {
+        use std::cell::Cell;
+        struct List<'a> {
+            ptr: Option<Gc<'a, List<'a>>>,
+        }
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            let root = eat_stack_and_exec(6, || {
+                let leaf = proxy.store(List {
+                    ptr: None,
+                });
+                let root = proxy.store(List {
+                    ptr: Some(leaf),
+                });
+                Box::new(root)
+            });
+
+            proxy.run();
+            assert_eq!(num_tracked_objs(&proxy), 2);
+
         };
 
         unsafe { col.run_with_gc(body) };
