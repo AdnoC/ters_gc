@@ -1,15 +1,15 @@
-enum Never {} // TODO Make NonNull<GcBox<T>>
+enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
 enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
 mod allocator;
 mod ptr;
 mod traceable;
 mod reg_flush {
-    use Never;
+    use BoxedCollector;
     extern "C" {
         pub(crate) fn flush_registers_and_call(
-            callback: extern "C" fn(*mut Never),
-            data: *mut Never,
+            callback: extern "C" fn(*mut BoxedCollector),
+            data: *mut BoxedCollector,
         );
     }
 }
@@ -87,7 +87,7 @@ impl Collector {
         };
     }
 
-    extern "C" fn mark_landingpad(data: *mut Never) {
+    extern "C" fn mark_landingpad(data: *mut BoxedCollector) {
         let data = data as *mut Collector;
         let collector: &mut Collector = unsafe { &mut *data };
         let stack_top = stack_ptr!();
@@ -140,13 +140,13 @@ impl Collector {
         }
 
         for addr in (bottom..top).step_by(size_of::<usize>()) {
-            let stack_ptr = addr as *const *const Never;
+            let stack_ptr = addr as *const *const UntypedGcBox;
             let stack_value = unsafe { *stack_ptr };
             self.mark_ptr(stack_value, true);
         }
     }
 
-    fn mark_ptr(&mut self, ptr: *const Never, root: bool) {
+    fn mark_ptr(&mut self, ptr: *const UntypedGcBox, root: bool) {
         if !self.allocator.is_ptr_in_range(ptr) {
             return;
         }
@@ -166,13 +166,13 @@ impl Collector {
         if let Some(children) = children {
             for val in children {
                 let val = unsafe { *val };
-                self.mark_ptr(val as *const Never, false);
+                self.mark_ptr(val as *const UntypedGcBox, false);
             }
         }
     }
 
     // ptr MUST be a valid tracked object
-    fn mark_island_ptr(&mut self, ptr: *const Never) {
+    fn mark_island_ptr(&mut self, ptr: *const UntypedGcBox) {
         assert!(self.allocator.is_ptr_in_range(ptr));
 
         let mut children = None;
@@ -182,7 +182,7 @@ impl Collector {
 
         if let Some(children) = children {
             for val in children {
-                let val = val as *const *const Never;
+                let val = val as *const *const UntypedGcBox;
                 let val = unsafe { *val };
                 if let Some(child) = self.allocator.info_for_ptr_mut(val) {
                     child.mark_isolated();
@@ -191,7 +191,7 @@ impl Collector {
         }
     }
 
-    fn mark_newly_found_ptr(&mut self, ptr: *const Never) {
+    fn mark_newly_found_ptr(&mut self, ptr: *const UntypedGcBox) {
         assert!(self.allocator.is_ptr_in_range(ptr));
 
         let mut children = None;
@@ -201,7 +201,7 @@ impl Collector {
 
         if let Some(children) = children {
             for val in children {
-                let val = val as *const *const Never;
+                let val = val as *const *const UntypedGcBox;
                 let val = unsafe { *val };
                 let mut is_valid = false;
                 if let Some(child) = self.allocator.info_for_ptr_mut(val) {

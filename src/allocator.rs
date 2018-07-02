@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use ::ptr::GcBox;
-use Never;
+use UntypedGcBox;
 
 
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
-    pub ptr: *const Never,
-    rebox: fn(*const Never),
+    pub ptr: *const UntypedGcBox,
+    rebox: fn(*const UntypedGcBox),
     branches: usize, // # of marks from ptrs stored in tracked objects
     roots: usize, // # of marks from ptrs stored in stack (since we can't traverse heap)
     isolated: usize, // # of marks from objects for which is_marked_reachable == false
-    refs: fn(*const Never) -> usize,
+    refs: fn(*const UntypedGcBox) -> usize,
     size: usize,
 }
 
@@ -110,7 +110,7 @@ impl Iterator for InnerObjectPtrs {
 }
 
 pub(crate) struct Allocator {
-    pub items: HashMap<*const Never, AllocInfo>,
+    pub items: HashMap<*const UntypedGcBox, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
     // max_ptr: usize,
     // min_ptr: usize,
@@ -136,7 +136,7 @@ impl Allocator {
     pub fn free<T>(&mut self, ptr: *const T) {
         self.items.remove(&(ptr as *const _)); // Will be deallocated by Drop
     }
-    pub fn _remove<T>(&mut self, ptr: *const Never) -> T {
+    pub fn _remove<T>(&mut self, ptr: *const UntypedGcBox) -> T {
         use std::mem::forget;
         let item = self.items.remove(&(ptr as *const _));
         forget(item);
@@ -151,12 +151,12 @@ impl Allocator {
     }
 
     // pub fn is_ptr_tracked<T>(&self, ptr: *const T) -> bool {
-    //     let ptr: *const Never = ptr as *const _;
+    //     let ptr: *const UntypedGcBox = ptr as *const _;
     //     self.items.contains_key(&ptr)
     // }
 
     pub(crate) fn info_for_ptr_mut<T>(&mut self, ptr: *const T) -> Option<&mut AllocInfo> {
-        let ptr: *const Never = ptr as *const _;
+        let ptr: *const UntypedGcBox = ptr as *const _;
         self.items.get_mut(&ptr)
     }
 
@@ -172,16 +172,16 @@ fn store_single_value<T>(value: T) -> *const GcBox<T> {
     Box::leak(storage)
 }
 
-fn get_rebox<T>() -> fn(*const Never) {
-    |ptr: *const Never| unsafe {
+fn get_rebox<T>() -> fn(*const UntypedGcBox) {
+    |ptr: *const UntypedGcBox| unsafe {
         // Should be safe to cast to mut, as this is only used for destruction.
         // There shouldn't be any other active pointers to the object.
         Box::<GcBox<T>>::from_raw(ptr as *const _ as *mut _);
     }
 }
 
-fn get_refs_accessor<T>() -> fn(*const Never) -> usize {
-    |ptr: *const Never| unsafe {
+fn get_refs_accessor<T>() -> fn(*const UntypedGcBox) -> usize {
+    |ptr: *const UntypedGcBox| unsafe {
         let gc_box = &*(ptr as *const GcBox<T>);
         gc_box.ref_count()
     }
