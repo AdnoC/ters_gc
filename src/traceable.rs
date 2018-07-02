@@ -44,7 +44,52 @@ mod trace_impls {
     use std::cmp::Ord;
 
 
-    impl<'a, T: TraceTo> TraceTo for &'a [T] {
+    macro_rules! noop_impls {
+        ($($T:ty)+) => {
+            $(
+                impl TraceTo for $T {
+                    fn trace_to(&self, tracer: &mut Tracer) {
+                        // noop
+                    }
+                }
+             )+
+        }
+    }
+    noop_impls! {
+        ()
+        bool
+        i8 i16 i32 i64 i128
+        u8 u16 u32 u64 u128
+        isize usize
+        f32 f64
+        char str
+    }
+    macro_rules! noop_fn_impl {
+        ($($T:tt)*) => {
+            impl<$($T,)* R> TraceTo for fn($($T),*) -> R {
+                fn trace_to(&self, tracer: &mut Tracer) {
+                    // noop
+                }
+            }
+        }
+    }
+    noop_fn_impl!();
+    noop_fn_impl!(Q);
+    noop_fn_impl!(Q W);
+    noop_fn_impl!(Q W E);
+    noop_fn_impl!(Q W E T);
+    impl<T> TraceTo for *const T {
+        fn trace_to(&self, tracer: &mut Tracer) {
+            // noop
+        }
+    }
+    impl<T> TraceTo for *mut T {
+        fn trace_to(&self, tracer: &mut Tracer) {
+            // noop
+        }
+    }
+
+    impl<'a, T: TraceTo> TraceTo for [T] {
         fn trace_to(&self, tracer: &mut Tracer) {
             for tracee in self.iter() {
                 tracee.trace_to(tracer);
@@ -225,5 +270,47 @@ mod tests {
         let tracee = vec![MustTrace::new(); 25];
         let tra_slice: &[MustTrace] = &tracee[..];
         tra_slice.trace_to(&mut tracer);
+    }
+    #[test]
+    fn trace_noops() {
+        use std::mem::transmute;
+
+        let mut tracer = Tracer::new();
+
+        macro_rules! test_noop_run {
+            ($($T:ty, $val:expr)+) => {
+                $(
+                    let t: $T = $val;
+                    t.trace_to(&mut tracer);
+                 )+
+            }
+        }
+        test_noop_run!(
+            (), ()
+            bool, true
+            i8, 0
+            i16, 0
+            i32, 0
+            i64, 0
+            i128, 0
+            u8, 0
+            u16, 0
+            u32, 0
+            u64, 0
+            u128, 0
+            isize, 0
+            usize, 0
+            f32, 0.0
+            f64, 0.0
+            char, 'a'
+            Box<str>, "Hello".to_string().into_boxed_str()
+
+            fn(), unsafe { transmute(0 as usize) }
+            fn() -> i8,  unsafe { transmute(0 as usize) }
+            fn(i8) -> i8, unsafe { transmute(0 as usize) }
+            fn(i8, u8, isize, usize) -> i8, unsafe { transmute(0 as usize) }
+        );
+        let t: &str = "Hello";
+        t.trace_to(&mut tracer);
     }
 }
