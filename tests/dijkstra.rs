@@ -11,6 +11,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use terse::*;
+use terse::traceable::{Tracer, TraceTo};
 
 // NOTE: Might have problems with SmallVec not clearing values of `remove`d entries
 
@@ -203,6 +204,14 @@ impl<'a> Node<'a> {
     }
 }
 
+impl<'a> TraceTo for Node<'a> {
+    fn trace_to(&self, tracer: &mut Tracer) {
+        for edge in self.adjacencies.borrow().iter() {
+            edge.trace_to(tracer);
+        }
+    }
+}
+
 fn connect_bidirectional<'a>(proxy: &mut Proxy<'a>, a: GcNode<'a>, b: GcNode<'a>, weight: u32) {
     a.connect_to(proxy, b.clone(), weight);
     b.connect_to(proxy, a, weight);
@@ -244,6 +253,11 @@ impl<'a> Hash for Node<'a> {
 struct Edge<'a> {
     dest: GcNode<'a>,
     weight: u32,
+}
+impl<'a> TraceTo for Edge<'a> {
+    fn trace_to(&self, tracer: &mut Tracer) {
+        self.dest.trace_to(tracer);
+    }
 }
 impl<'a> fmt::Debug for Edge<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

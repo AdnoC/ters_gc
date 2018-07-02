@@ -283,23 +283,24 @@ mod tests {
 
     #[test]
     fn casting_safe_and_weak() {
+        use traceable::NoTrace;
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
-            let num = proxy.store(Cell::new(0));
+            let num = proxy.store(NoTrace(Cell::new(0)));
             let num_weak = Gc::downgrade(&num);
             {
                 let num_ref = num_weak.get().unwrap();
-                num_ref.set(num_ref.get() + 1);
+                num_ref.0.set(num_ref.0.get() + 1);
             }
             let num = num_weak.upgrade().unwrap();
-            num.set(num.get() + 1);
+            num.0.set(num.0.get() + 1);
             let num_safe = Gc::to_safe(num);
             {
                 let num_ref = num_weak.get().unwrap();
-                num_ref.set(num_ref.get() + 1);
+                num_ref.0.set(num_ref.0.get() + 1);
             }
             let num = Gc::from_safe(num_safe);
-            assert_eq!(num.get(), 3);
+            assert_eq!(num.0.get(), 3);
         };
 
         unsafe { col.run_with_gc(body) };
@@ -310,7 +311,7 @@ mod tests {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
             let num_weak = eat_stack_and_exec(10, || {
-                let num = proxy.store(Cell::new(0));
+                let num = proxy.store(0);
                 let num_weak = Gc::downgrade(&num);
                 num_weak
             });
@@ -327,7 +328,7 @@ mod tests {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
             let num_safe = eat_stack_and_exec(10, || {
-                let num = proxy.store(Cell::new(0));
+                let num = proxy.store(0);
                 Gc::get_gc_box(&num).decr_ref();
                 let num_safe = Gc::to_safe(num);
                 num_safe

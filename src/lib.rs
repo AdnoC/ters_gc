@@ -2,8 +2,8 @@ enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
 enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
 mod allocator;
-mod ptr;
-mod traceable;
+pub mod ptr;
+pub mod traceable;
 mod reg_flush {
     use BoxedCollector;
     extern "C" {
@@ -18,6 +18,7 @@ pub use ptr::Gc;
 use ptr::GcBox;
 use allocator::Allocator;
 use allocator::AllocInfo;
+use traceable::TraceTo;
 use std::marker::PhantomData;
 
 macro_rules! stack_ptr {
@@ -65,7 +66,7 @@ impl Collector {
         func(proxy)
     }
 
-    fn alloc<T>(&mut self, val: T) -> *const GcBox<T> {
+    fn alloc<T: TraceTo>(&mut self, val: T) -> *const GcBox<T> {
         if self.should_collect() {
             self.run();
         }
@@ -292,7 +293,7 @@ pub struct Proxy<'arena> {
 }
 
 impl<'a> Proxy<'a> {
-    pub fn store<T>(&mut self, payload: T) -> Gc<'a, T> {
+    pub fn store<T: TraceTo>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
         Gc::from_raw(ptr, self.collector.magic, PhantomData)
     }
@@ -324,6 +325,11 @@ mod tests {
 
     struct LinkedList<'a> {
         next: Option<Gc<'a, LinkedList<'a>>>,
+    }
+    impl<'a> TraceTo for LinkedList<'a> {
+        fn trace_to(&self, tracer: &mut traceable::Tracer) {
+            self.next.trace_to(tracer);
+        }
     }
 
     fn num_tracked_objs(proxy: &Proxy) -> usize {
@@ -460,17 +466,22 @@ mod tests {
 
     #[test]
     fn self_ref_cycle() {
-        use std::cell::Cell;
+        use std::cell::RefCell;
         struct SelfRef<'a> {
-            self_ptr: Cell<Option<Gc<'a, SelfRef<'a>>>>
+            self_ptr: RefCell<Option<Gc<'a, SelfRef<'a>>>>
+        }
+        impl<'a> TraceTo for SelfRef<'a> {
+            fn trace_to(&self, tracer: &mut traceable::Tracer) {
+                self.self_ptr.trace_to(tracer);
+            }
         }
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
             eat_stack_and_exec(6, || {
                 let ptr = proxy.store(SelfRef {
-                    self_ptr: Cell::new(None),
+                    self_ptr: RefCell::new(None),
                 });
-                ptr.self_ptr.set(Some(ptr.clone()));
+                *ptr.self_ptr.borrow_mut() = Some(ptr.clone());
             });
 
             proxy.run();
@@ -485,6 +496,11 @@ mod tests {
         use std::cell::Cell;
         struct List<'a> {
             ptr: Option<Gc<'a, List<'a>>>,
+        }
+        impl<'a> TraceTo for List<'a> {
+            fn trace_to(&self, tracer: &mut traceable::Tracer) {
+                self.ptr.trace_to(tracer);
+            }
         }
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {

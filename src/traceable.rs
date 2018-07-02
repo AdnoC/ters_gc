@@ -22,6 +22,13 @@ impl Tracer {
     }
 }
 
+pub struct NoTrace<T>(pub T);
+impl<T> TraceTo for NoTrace<T> {
+    fn trace_to(&self, _: &mut Tracer) {
+        // noop
+    }
+}
+
 impl<'a, T> TraceTo for Gc<'a, T> {
     fn trace_to(&self, tracer: &mut Tracer) {
         tracer.add_box(Gc::box_ptr(self));
