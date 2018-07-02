@@ -1,11 +1,13 @@
 use UntypedGcBox;
 use ::ptr::{Gc, Safe, GcBox, Weak};
 
-// Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`
+// Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`.
+// Can act funny if you have Sp<Gc<T>> where Sp is a smart pointer that
+// doesn't impl TraceTo.
 pub trait TraceTo {
     fn trace_to(&self, tracer: &mut Tracer);
 }
-struct TraceDest(*const UntypedGcBox);
+pub(crate) struct TraceDest(pub *const UntypedGcBox);
 
 pub struct Tracer {
     targets: Vec<TraceDest>,
@@ -17,8 +19,14 @@ impl Tracer {
             targets: vec![],
         }
     }
+    pub fn add_target<T: TraceTo>(&mut self, target: &T) {
+        target.trace_to(self);
+    }
     fn add_box<T>(&mut self, gc_box: *const GcBox<T>) {
         self.targets.push(TraceDest(gc_box as *const _));
+    }
+    pub(crate) fn results(self) -> ::std::vec::IntoIter<TraceDest> {
+        self.targets.into_iter()
     }
 }
 

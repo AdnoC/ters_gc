@@ -1,5 +1,5 @@
 enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
-enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
+pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
 mod allocator;
 pub mod ptr;
@@ -166,6 +166,7 @@ impl Collector {
     }
 
     fn mark_ptr(&mut self, ptr: *const UntypedGcBox, root: bool) {
+        println!("Marking ptr {}", ptr as usize);
         if !self.allocator.is_ptr_in_range(ptr) {
             return;
         }
@@ -173,7 +174,7 @@ impl Collector {
         let mut children = None;
         if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
             if !info.is_marked_reachable() {
-                children = Some(info.inner_ptrs());
+                children = Some(info.children());
             }
             if root {
                 info.mark_root();
@@ -195,13 +196,11 @@ impl Collector {
 
         let mut children = None;
         if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
-            children = Some(info.inner_ptrs());
+            children = Some(info.children());
         }
 
         if let Some(children) = children {
             for val in children {
-                let val = val as *const *const UntypedGcBox;
-                let val = unsafe { *val };
                 if let Some(child) = self.allocator.info_for_ptr_mut(val) {
                     child.mark_isolated();
                 }
@@ -214,13 +213,11 @@ impl Collector {
 
         let mut children = None;
         if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
-            children = Some(info.inner_ptrs());
+            children = Some(info.children());
         }
 
         if let Some(children) = children {
             for val in children {
-                let val = val as *const *const UntypedGcBox;
-                let val = unsafe { *val };
                 let mut is_valid = false;
                 if let Some(child) = self.allocator.info_for_ptr_mut(val) {
                     child.unmark_isolated();
@@ -499,6 +496,8 @@ mod tests {
                     self_ptr: RefCell::new(None),
                 });
                 *ptr.self_ptr.borrow_mut() = Some(ptr.clone());
+
+                proxy.run();
             });
 
             proxy.run();

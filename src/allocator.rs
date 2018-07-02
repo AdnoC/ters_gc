@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use ::ptr::GcBox;
 use UntypedGcBox;
-use traceable::TraceTo;
+use traceable::{TraceTo, Tracer};
 use {AsUntyped, AsTyped};
 
 
+// TODO: Make mark stats into Cell so that the marking functs can take &self
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
     pub ptr: *const UntypedGcBox,
@@ -13,6 +14,7 @@ pub(crate) struct AllocInfo {
     roots: usize, // # of marks from ptrs stored in stack (since we can't traverse heap)
     isolated: usize, // # of marks from objects for which is_marked_reachable == false
     refs: fn(*const UntypedGcBox) -> usize,
+    trace: fn(*const UntypedGcBox) -> Tracer,
     size: usize,
 }
 
@@ -26,6 +28,7 @@ impl AllocInfo {
             roots: 0,
             isolated: 0,
             refs: get_refs_accessor::<T>(),
+            trace: get_tracer::<T>(),
             size: size_of::<T>(),
         }
     }
@@ -67,6 +70,12 @@ impl AllocInfo {
 
     pub fn ref_count(&self) -> usize {
         (self.refs)(self.ptr)
+    }
+
+    pub(crate) fn children(&self) -> impl Iterator<Item=*const UntypedGcBox> {
+        let tracer = (self.trace)(self.ptr);
+        tracer.results()
+            .map(|dest| dest.0)
     }
 
     pub fn inner_ptrs(&self) -> InnerObjectPtrs {
@@ -185,6 +194,15 @@ fn get_refs_accessor<T>() -> fn(*const UntypedGcBox) -> usize {
     |ptr: *const UntypedGcBox| unsafe {
         let gc_box: &GcBox<T> = &*(ptr.as_typed());
         gc_box.ref_count()
+    }
+}
+
+fn get_tracer<T: TraceTo>() -> fn(*const UntypedGcBox) -> Tracer {
+    |ptr: *const UntypedGcBox| unsafe {
+        let mut tracer = Tracer::new();
+        let gc_box: &GcBox<T> = &*(ptr.as_typed());
+        gc_box.borrow().trace_to(&mut tracer);
+        tracer
     }
 }
 

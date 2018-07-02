@@ -50,6 +50,15 @@ where
         &*self.ptr
     }
 }
+impl<P> TraceTo for PrintWrapper<P>
+where
+    P: Deref + TraceTo,
+    <P as Deref>::Target: fmt::Debug,
+{
+    fn trace_to(&self, tracer: &mut Tracer) {
+        self.ptr.trace_to(tracer);
+    }
+}
 
 // impl<P> PartialEq for PrintWrapper<P>
 // where P: Deref + PartialEq, <P as Deref>::Target: fmt::Debug {
@@ -105,6 +114,7 @@ impl<'a> Graph<'a> {
     }
 
     fn path_for(&self, src: GcNode<'a>, dest: GcNode<'a>) -> Option<SmallVec<[GcNode<'a>; 16]>> {
+        println!("path_for");
         // Want lower distance -> higher priority
         fn dist_to_priority(distance: u64) -> u64 {
             std::u64::MAX - distance
