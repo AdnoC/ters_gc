@@ -37,6 +37,9 @@ impl AllocInfo {
     pub fn mark_isolated(&mut self) {
         self.isolated += 1;
     }
+    pub fn unmark_isolated(&mut self) {
+        self.isolated -= 1;
+    }
 
     pub fn unmark(&mut self) {
         self.branches = 0;

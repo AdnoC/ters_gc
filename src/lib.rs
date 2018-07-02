@@ -101,11 +101,18 @@ impl Collector {
         let mut unmarked_objects = vec![];
         for info in self.allocator.items.values() {
             if !info.is_marked_reachable() {
-                unmarked_objects.push(info.ptr);
+                unmarked_objects.push(info);
             }
         }
-        for ptr in unmarked_objects.into_iter() {
-            self.mark_island_ptr(ptr);
+        for info in &unmarked_objects {
+            self.mark_island_ptr(info.ptr);
+        }
+
+        unmarked_objects.retain(|info| Self::is_object_reachable(info));
+        let heap_objects: Vec<_> = unmarked_objects.into_iter().map(|info| info.ptr).collect();
+
+        for ptr in heap_objects.into_iter() {
+            self.mark_newly_found_ptr(ptr);
         }
     }
 
@@ -172,6 +179,31 @@ impl Collector {
                 let val = unsafe { *val };
                 if let Some(child) = self.allocator.info_for_ptr_mut(val) {
                     child.mark_isolated();
+                }
+            }
+        }
+    }
+
+    fn mark_newly_found_ptr(&mut self, ptr: *const Never) {
+        assert!(self.allocator.is_ptr_in_range(ptr));
+
+        let mut children = None;
+        if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
+            children = Some(info.inner_ptrs());
+        }
+
+        if let Some(children) = children {
+            for val in children {
+                let val = val as *const *const Never;
+                let val = unsafe { *val };
+                let mut is_valid = false;
+                if let Some(child) = self.allocator.info_for_ptr_mut(val) {
+                    child.unmark_isolated();
+                    child.mark_branch();
+                    is_valid = true;
+                }
+                if is_valid {
+                    self.mark_newly_found_ptr(val);
                 }
             }
         }
