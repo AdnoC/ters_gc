@@ -98,20 +98,25 @@ impl Collector {
     }
 
     fn mark_in_gc(&mut self) {
-        let mut unmarked_objects = vec![];
+        let mut unreachable_objects = vec![];
         for info in self.allocator.items.values() {
             if !info.is_marked_reachable() {
-                unmarked_objects.push(info);
+                unreachable_objects.push(info.ptr);
             }
         }
-        for info in &unmarked_objects {
-            self.mark_island_ptr(info.ptr);
+        for &ptr in &unreachable_objects {
+            self.mark_island_ptr(ptr);
         }
 
-        unmarked_objects.retain(|info| Self::is_object_reachable(info));
-        let heap_objects: Vec<_> = unmarked_objects.into_iter().map(|info| info.ptr).collect();
-
-        for ptr in heap_objects.into_iter() {
+        let mut heap_objects = vec![];
+        for ptr in unreachable_objects {
+            let info = self.allocator.info_for_ptr_mut(ptr);
+            let info = info.expect("no info :(");
+            if Self::is_object_reachable(info) {
+                heap_objects.push(ptr);
+            }
+        }
+        for ptr in heap_objects {
             self.mark_newly_found_ptr(ptr);
         }
     }
