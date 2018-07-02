@@ -1,7 +1,9 @@
 enum Never {} // TODO Make NonNull<GcBox<T>>
+enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
 mod allocator;
 mod ptr;
+mod traceable;
 mod reg_flush {
     use Never;
     extern "C" {

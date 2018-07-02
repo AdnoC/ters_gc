@@ -140,6 +140,9 @@ impl<'a, T> Gc<'a, T> {
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
     }
+    pub(crate) fn box_ptr(this: &Gc<'a, T>) -> *const GcBox<T> {
+        this.ptr.ptr
+    }
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {
             _marker: PhantomData,
@@ -221,6 +224,14 @@ impl<'a, T> Safe<'a, T> {
     }
     pub fn is_alive(&self) -> bool {
         self.ptr.is_alive()
+    }
+    pub(crate) fn box_ptr(&self) -> Option<*const GcBox<T>> {
+        if self.is_alive() {
+            self._gc_marker.as_ref()
+                .map(|gc| Gc::box_ptr(gc))
+        } else {
+            None
+        }
     }
 }
 impl<'a, T> Drop for Safe<'a, T> {
