@@ -1,5 +1,5 @@
 use UntypedGcBox;
-use ::ptr::{Gc, Safe, GcBox};
+use ::ptr::{Gc, Safe, GcBox, Weak};
 
 // Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`
 pub trait TraceTo {
@@ -42,6 +42,11 @@ impl<'a, T> TraceTo for Safe<'a, T> {
         }
     }
 }
+impl<'a, T> TraceTo for Weak<'a, T> {
+    fn trace_to(&self, _: &mut Tracer) {
+        // noop
+    }
+}
 
 mod trace_impls {
     use super::{TraceTo, Tracer};
@@ -55,7 +60,7 @@ mod trace_impls {
         ($($T:ty)+) => {
             $(
                 impl TraceTo for $T {
-                    fn trace_to(&self, tracer: &mut Tracer) {
+                    fn trace_to(&self, _: &mut Tracer) {
                         // noop
                     }
                 }
@@ -74,7 +79,7 @@ mod trace_impls {
     macro_rules! noop_fn_impl {
         ($($T:tt)*) => {
             impl<$($T,)* R> TraceTo for fn($($T),*) -> R {
-                fn trace_to(&self, tracer: &mut Tracer) {
+                fn trace_to(&self, _: &mut Tracer) {
                     // noop
                 }
             }
@@ -86,12 +91,12 @@ mod trace_impls {
     noop_fn_impl!(Q W E);
     noop_fn_impl!(Q W E T);
     impl<T> TraceTo for *const T {
-        fn trace_to(&self, tracer: &mut Tracer) {
+        fn trace_to(&self, _: &mut Tracer) {
             // noop
         }
     }
     impl<T> TraceTo for *mut T {
-        fn trace_to(&self, tracer: &mut Tracer) {
+        fn trace_to(&self, _: &mut Tracer) {
             // noop
         }
     }
