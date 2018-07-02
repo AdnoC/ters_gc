@@ -21,6 +21,24 @@ use allocator::AllocInfo;
 use traceable::TraceTo;
 use std::marker::PhantomData;
 
+trait AsUntyped {
+    fn as_untyped(&self) -> *const UntypedGcBox;
+}
+impl<T> AsUntyped for *const GcBox<T> {
+    fn as_untyped(&self) -> *const UntypedGcBox {
+        (*self) as _
+    }
+}
+trait AsTyped {
+    fn as_typed<T>(&self) -> *const GcBox<T>;
+}
+impl AsTyped for *const UntypedGcBox {
+    fn as_typed<T>(&self) -> *const GcBox<T> {
+        (*self) as _
+    }
+}
+
+
 macro_rules! stack_ptr {
     () => {{
         let a = 0usize; // usize so that it is aligned
@@ -166,8 +184,7 @@ impl Collector {
 
         if let Some(children) = children {
             for val in children {
-                let val = unsafe { *val };
-                self.mark_ptr(val as *const UntypedGcBox, false);
+                self.mark_ptr(val, false);
             }
         }
     }

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use ::ptr::GcBox;
 use UntypedGcBox;
 use traceable::TraceTo;
+use {AsUntyped, AsTyped};
 
 
 /// Type-erased allocation info
@@ -19,7 +20,7 @@ impl AllocInfo {
     fn new<T: TraceTo>(value: T) -> AllocInfo {
         use std::mem::size_of;
         AllocInfo {
-            ptr: store_single_value(value) as *const _,
+            ptr: store_single_value(value).as_untyped(),
             rebox: get_rebox::<T>(),
             branches: 0,
             roots: 0,
@@ -92,13 +93,13 @@ impl Drop for AllocInfo {
 }
 
 pub(crate) struct InnerObjectPtrs {
-    ptr: *const usize,
+    ptr: *const *const UntypedGcBox,
     idx: isize,
     length: isize,
 }
 
 impl Iterator for InnerObjectPtrs {
-    type Item = *const usize;
+    type Item = *const UntypedGcBox;
     fn next(&mut self) -> Option<Self::Item> {
         if self.idx >= self.length {
             return None;
@@ -106,7 +107,7 @@ impl Iterator for InnerObjectPtrs {
 
         self.idx += 1;
 
-        Some(unsafe { self.ptr.offset(self.idx - 1) })
+        Some(unsafe { *self.ptr.offset(self.idx - 1) })
     }
 }
 
@@ -132,20 +133,20 @@ impl Allocator {
         // self.min_ptr = min(self.min_ptr, info.ptr as usize);
         let ptr = info.ptr;
         self.items.insert(ptr, info);
-        ptr as *const _
+        ptr.as_typed()
     }
-    pub fn free<T>(&mut self, ptr: *const T) {
-        self.items.remove(&(ptr as *const _)); // Will be deallocated by Drop
+    pub fn free(&mut self, ptr: *const UntypedGcBox) {
+        self.items.remove(&(ptr)); // Will be deallocated by Drop
     }
     pub fn _remove<T>(&mut self, ptr: *const UntypedGcBox) -> T {
         use std::mem::forget;
-        let item = self.items.remove(&(ptr as *const _));
+        let item = self.items.remove(&ptr);
         forget(item);
         let boxed: Box<GcBox<T>> = unsafe { Box::from_raw(ptr as *mut _) };
         boxed.reclaim_value()
     }
 
-    pub fn is_ptr_in_range<T>(&self, _ptr: *const T) -> bool {
+    pub fn is_ptr_in_range(&self, _ptr: *const UntypedGcBox) -> bool {
         true
         // let ptr_val = ptr as usize;
         // self.min_ptr >= ptr_val && self.max_ptr <= ptr_val
@@ -156,8 +157,7 @@ impl Allocator {
     //     self.items.contains_key(&ptr)
     // }
 
-    pub(crate) fn info_for_ptr_mut<T>(&mut self, ptr: *const T) -> Option<&mut AllocInfo> {
-        let ptr: *const UntypedGcBox = ptr as *const _;
+    pub(crate) fn info_for_ptr_mut(&mut self, ptr: *const UntypedGcBox) -> Option<&mut AllocInfo> {
         self.items.get_mut(&ptr)
     }
 
@@ -183,7 +183,7 @@ fn get_rebox<T>() -> fn(*const UntypedGcBox) {
 
 fn get_refs_accessor<T>() -> fn(*const UntypedGcBox) -> usize {
     |ptr: *const UntypedGcBox| unsafe {
-        let gc_box = &*(ptr as *const GcBox<T>);
+        let gc_box: &GcBox<T> = &*(ptr.as_typed());
         gc_box.ref_count()
     }
 }
@@ -282,7 +282,7 @@ mod tests {
         let mut alloc = Allocator::new();
         let counter = DtorCounter::new();
         let ptr = alloc.alloc(counter.incr());
-        alloc.free(ptr);
+        alloc.free(ptr.as_untyped());
         assert_eq!(counter.count(), 1);
     }
 }
