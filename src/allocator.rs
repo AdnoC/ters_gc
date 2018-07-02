@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use ::ptr::GcBox;
 use UntypedGcBox;
+use traceable::TraceTo;
 
 
 /// Type-erased allocation info
@@ -15,7 +16,7 @@ pub(crate) struct AllocInfo {
 }
 
 impl AllocInfo {
-    fn new<T>(value: T) -> AllocInfo {
+    fn new<T: TraceTo>(value: T) -> AllocInfo {
         use std::mem::size_of;
         AllocInfo {
             ptr: store_single_value(value) as *const _,
@@ -124,7 +125,7 @@ impl Allocator {
             // min_ptr: ::std::usize::MAX,
         }
     }
-    pub fn alloc<T>(&mut self, value: T) -> *const GcBox<T> {
+    pub fn alloc<T: TraceTo>(&mut self, value: T) -> *const GcBox<T> {
         // use std::cmp::{min, max};
         let info = AllocInfo::new(value);
         // self.max_ptr = max(self.max_ptr, info.ptr as usize);
@@ -247,6 +248,11 @@ mod tests {
 
             let mut counter_ref = self.counter.borrow_mut();
             counter_ref.num_run += 1;
+        }
+    }
+    impl TraceTo for CounterIncrementer {
+        fn trace_to(&self, _: &mut ::traceable::Tracer) {
+            // noop
         }
     }
 
