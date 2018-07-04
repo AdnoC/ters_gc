@@ -79,45 +79,11 @@ impl AllocInfo {
             .map(|dest| dest.0)
     }
 
-    pub fn inner_ptrs(&self) -> InnerObjectPtrs {
-        use std::mem::{align_of, size_of};
-        let aligned_ptr = round_up(self.ptr as usize, align_of::<usize>()) as *const _;
-        let diff = aligned_ptr as usize - self.ptr as usize;
-        let length = if self.size > diff {
-            ((self.size - diff) / size_of::<usize>()) as isize
-        } else {
-            0
-        };
-        InnerObjectPtrs {
-            ptr: aligned_ptr,
-            idx: 0,
-            length,
-        }
-    }
 }
 
 impl Drop for AllocInfo {
     fn drop(&mut self) {
         (self.rebox)(self.ptr);
-    }
-}
-
-pub(crate) struct InnerObjectPtrs {
-    ptr: *const *const UntypedGcBox,
-    idx: isize,
-    length: isize,
-}
-
-impl Iterator for InnerObjectPtrs {
-    type Item = *const UntypedGcBox;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.idx >= self.length {
-            return None;
-        }
-
-        self.idx += 1;
-
-        Some(unsafe { *self.ptr.offset(self.idx - 1) })
     }
 }
 
