@@ -21,12 +21,12 @@ impl<T> AsConstPtr for NonNull<T> {
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
     pub ptr: NonNull<UntypedGcBox>,
-    rebox: fn(*const UntypedGcBox),
+    rebox: fn(NonNull<UntypedGcBox>),
     branches: Cell<usize>, // # of marks from ptrs stored in tracked objects
     roots: Cell<usize>,    // # of marks from ptrs stored in stack (since we can't traverse heap)
     isolated: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
-    refs: fn(*const UntypedGcBox) -> usize,
-    trace: fn(*const UntypedGcBox) -> Tracer,
+    refs: fn(NonNull<UntypedGcBox>) -> usize,
+    trace: fn(NonNull<UntypedGcBox>) -> Tracer,
 }
 
 impl AllocInfo {
@@ -81,18 +81,18 @@ impl AllocInfo {
     }
 
     pub fn ref_count(&self) -> usize {
-        (self.refs)(self.ptr.as_const_ptr())
+        (self.refs)(self.ptr)
     }
 
     pub(crate) fn children(&self) -> impl Iterator<Item = *const UntypedGcBox> {
-        let tracer = (self.trace)(self.ptr.as_const_ptr());
+        let tracer = (self.trace)(self.ptr);
         tracer.results().map(|dest| dest.0)
     }
 }
 
 impl Drop for AllocInfo {
     fn drop(&mut self) {
-        (self.rebox)(self.ptr.as_const_ptr());
+        (self.rebox)(self.ptr);
     }
 }
 
@@ -158,25 +158,27 @@ fn store_single_value<T>(value: T) -> NonNull<GcBox<T>> {
     unsafe { NonNull::new_unchecked(Box::leak(storage)) }
 }
 
-fn get_rebox<T>() -> fn(*const UntypedGcBox) {
-    |ptr: *const UntypedGcBox| unsafe {
+fn get_rebox<T>() -> fn(NonNull<UntypedGcBox>) {
+    |ptr: NonNull<UntypedGcBox>| unsafe {
         // Should be safe to cast to mut, as this is only used for destruction.
         // There shouldn't be any other active pointers to the object.
-        Box::<GcBox<T>>::from_raw(ptr as *const _ as *mut _);
+        Box::<GcBox<T>>::from_raw(ptr.cast::<GcBox<T>>().as_ptr());
     }
 }
 
-fn get_refs_accessor<T>() -> fn(*const UntypedGcBox) -> usize {
-    |ptr: *const UntypedGcBox| unsafe {
-        let gc_box: &GcBox<T> = &*(ptr as *const _); // FIXME as_typed
+fn get_refs_accessor<T>() -> fn(NonNull<UntypedGcBox>) -> usize {
+    |ptr: NonNull<UntypedGcBox>| unsafe {
+        let ptr = ptr.cast::<GcBox<T>>();
+        let gc_box = ptr.as_ref(); // FIXME as_typed
         gc_box.ref_count()
     }
 }
 
-fn get_tracer<T: TraceTo>() -> fn(*const UntypedGcBox) -> Tracer {
-    |ptr: *const UntypedGcBox| unsafe {
+fn get_tracer<T: TraceTo>() -> fn(NonNull<UntypedGcBox>) -> Tracer {
+    |ptr: NonNull<UntypedGcBox>| unsafe {
         let mut tracer = Tracer::new();
-        let gc_box: &GcBox<T> = &*(ptr as *const _); // FIXME as_typed
+        let ptr = ptr.cast::<GcBox<T>>();
+        let gc_box = ptr.as_ref(); // FIXME as_typed
         gc_box.borrow().trace_to(&mut tracer);
         tracer
     }
@@ -271,7 +273,7 @@ mod tests {
         let mut alloc = Allocator::new();
         let counter = DtorCounter::new();
         let ptr = alloc.alloc(counter.incr());
-        alloc.free(ptr.as_untyped());
+        alloc.free(ptr as *const _); // FIXME as_untyped
         assert_eq!(counter.count(), 1);
     }
 }
