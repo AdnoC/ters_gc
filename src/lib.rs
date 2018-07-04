@@ -14,12 +14,12 @@ mod reg_flush {
     }
 }
 
+use allocator::AllocInfo;
+use allocator::Allocator;
 pub use ptr::Gc;
 use ptr::GcBox;
-use allocator::Allocator;
-use allocator::AllocInfo;
-use traceable::TraceTo;
 use std::marker::PhantomData;
+use traceable::TraceTo;
 
 trait AsUntyped {
     fn as_untyped(&self) -> *const UntypedGcBox;
@@ -37,7 +37,6 @@ impl AsTyped for *const UntypedGcBox {
         (*self) as _
     }
 }
-
 
 macro_rules! stack_ptr {
     () => {{
@@ -124,14 +123,16 @@ impl Collector {
     }
 
     fn mark_in_gc(&self) {
-        let unreachable_objects = self.allocator.items.values()
+        let unreachable_objects = self
+            .allocator
+            .items
+            .values()
             .filter(|info| !info.is_marked_reachable());
         for info in unreachable_objects.clone() {
             self.mark_island_ptr(info.ptr);
         }
 
-        let heap_objects = unreachable_objects
-            .filter(|info| Self::is_object_reachable(info));
+        let heap_objects = unreachable_objects.filter(|info| Self::is_object_reachable(info));
         for info in heap_objects {
             self.mark_newly_found_ptr(info.ptr);
         }
@@ -327,7 +328,6 @@ impl<'a> Proxy<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,7 +388,7 @@ mod tests {
             for _ in 0..num_useful {
                 head = prepend_ll!(); //(&mut proxy, head);
             }
-             eat_stack_and_exec(10, ||  {
+            eat_stack_and_exec(10, || {
                 for _ in 0..num_wasted {
                     proxy.store(22);
                 }
@@ -477,7 +477,7 @@ mod tests {
     fn self_ref_cycle() {
         use std::cell::RefCell;
         struct SelfRef<'a> {
-            self_ptr: RefCell<Option<Gc<'a, SelfRef<'a>>>>
+            self_ptr: RefCell<Option<Gc<'a, SelfRef<'a>>>>,
         }
         impl<'a> TraceTo for SelfRef<'a> {
             fn trace_to(&self, tracer: &mut traceable::Tracer) {
@@ -515,18 +515,13 @@ mod tests {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
             let root = eat_stack_and_exec(6, || {
-                let leaf = proxy.store(List {
-                    ptr: None,
-                });
-                let root = proxy.store(List {
-                    ptr: Some(leaf),
-                });
+                let leaf = proxy.store(List { ptr: None });
+                let root = proxy.store(List { ptr: Some(leaf) });
                 Box::new(root)
             });
 
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 2);
-
         };
 
         unsafe { col.run_with_gc(body) };

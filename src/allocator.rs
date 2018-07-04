@@ -1,10 +1,9 @@
-use std::collections::HashMap;
+use ptr::GcBox;
 use std::cell::Cell;
-use ::ptr::GcBox;
-use UntypedGcBox;
+use std::collections::HashMap;
 use traceable::{TraceTo, Tracer};
-use {AsUntyped, AsTyped};
-
+use UntypedGcBox;
+use {AsTyped, AsUntyped};
 
 // TODO: Make mark stats into Cell so that the marking functs can take &self
 /// Type-erased allocation info
@@ -12,7 +11,7 @@ pub(crate) struct AllocInfo {
     pub ptr: *const UntypedGcBox,
     rebox: fn(*const UntypedGcBox),
     branches: Cell<usize>, // # of marks from ptrs stored in tracked objects
-    roots: Cell<usize>, // # of marks from ptrs stored in stack (since we can't traverse heap)
+    roots: Cell<usize>,    // # of marks from ptrs stored in stack (since we can't traverse heap)
     isolated: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
     refs: fn(*const UntypedGcBox) -> usize,
     trace: fn(*const UntypedGcBox) -> Tracer,
@@ -70,12 +69,10 @@ impl AllocInfo {
         (self.refs)(self.ptr)
     }
 
-    pub(crate) fn children(&self) -> impl Iterator<Item=*const UntypedGcBox> {
+    pub(crate) fn children(&self) -> impl Iterator<Item = *const UntypedGcBox> {
         let tracer = (self.trace)(self.ptr);
-        tracer.results()
-            .map(|dest| dest.0)
+        tracer.results().map(|dest| dest.0)
     }
-
 }
 
 impl Drop for AllocInfo {
@@ -173,8 +170,8 @@ fn get_tracer<T: TraceTo>() -> fn(*const UntypedGcBox) -> Tracer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::rc::Rc;
     use std::cell::RefCell;
+    use std::rc::Rc;
 
     struct DtorCounter {
         inner: Rc<RefCell<DtorCounterInner>>,

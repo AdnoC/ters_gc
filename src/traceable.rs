@@ -1,5 +1,5 @@
+use ptr::{Gc, GcBox, Safe, Weak};
 use UntypedGcBox;
-use ::ptr::{Gc, Safe, GcBox, Weak};
 
 // Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`.
 // Can act funny if you have Sp<Gc<T>> where Sp is a smart pointer that
@@ -15,9 +15,7 @@ pub struct Tracer {
 
 impl Tracer {
     pub(crate) fn new() -> Tracer {
-        Tracer {
-            targets: vec![],
-        }
+        Tracer { targets: vec![] }
     }
     pub fn add_target<T: TraceTo>(&mut self, target: &T) {
         target.trace_to(self);
@@ -60,9 +58,8 @@ mod trace_impls {
     use super::{TraceTo, Tracer};
     use std;
     use std::cmp::Eq;
-    use std::hash::Hash;
     use std::cmp::Ord;
-
+    use std::hash::Hash;
 
     macro_rules! noop_impls {
         ($($T:ty)+) => {
@@ -277,9 +274,21 @@ mod tests {
         }
         let mut tracer = Tracer::new();
         let tracee = [
-            nm(), nm(), nm(), nm(), nm(),
-            nm(), nm(), nm(), nm(), nm(),
-            nm(), nm(), nm(), nm(), nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
+            nm(),
         ];
         tracee.trace_to(&mut tracer);
     }

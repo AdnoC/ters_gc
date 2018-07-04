@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
+use terse::traceable::{TraceTo, Tracer};
 use terse::*;
-use terse::traceable::{Tracer, TraceTo};
 
 // NOTE: Might have problems with SmallVec not clearing values of `remove`d entries
 
@@ -232,9 +232,7 @@ impl<'a> fmt::Debug for Node<'a> {
         struct AdjWrapper<'b, 'a: 'b>(&'b RefCell<SmallVec<[GcEdge<'a>; 16]>>);
         impl<'a, 'b> fmt::Debug for AdjWrapper<'a, 'b> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.debug_list()
-                    .entries(self.0.borrow().iter())
-                    .finish()
+                f.debug_list().entries(self.0.borrow().iter()).finish()
             }
         }
         let adj = AdjWrapper(&self.adjacencies);

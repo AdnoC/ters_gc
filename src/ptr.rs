@@ -1,8 +1,8 @@
-use std::ops::Deref;
-use std::marker::PhantomData;
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::cell::Cell;
+use std::cell::RefCell;
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::rc::Rc;
 pub(crate) struct GcBox<T> {
     val: T,
     refs: Cell<usize>,
@@ -35,7 +35,7 @@ impl<T> GcBox<T> {
 
     fn tracking_ref(&self) -> TrackingRef<T> {
         if !self.coroner.is_tracking() {
-        let self_ptr = self as *const _;
+            let self_ptr = self as *const _;
             self.coroner.track(self_ptr);
         }
         let tracker = self.coroner.tracker();
@@ -43,7 +43,7 @@ impl<T> GcBox<T> {
     }
 }
 
-struct Coroner<T> (RefCell<Option<LifeTracker<T>>>);
+struct Coroner<T>(RefCell<Option<LifeTracker<T>>>);
 impl<T> Drop for Coroner<T> {
     fn drop(&mut self) {
         if let Some(ref tracker) = *self.0.borrow() {
@@ -112,7 +112,7 @@ impl<T> TrackingRef<T> {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GcPtr<T> {
-    ptr: *const GcBox<T>,// TODO Make NonNull<GcBox<T>>
+    ptr: *const GcBox<T>, // TODO Make NonNull<GcBox<T>>
     magic: usize,
 }
 #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
@@ -122,13 +122,14 @@ pub struct Gc<'arena, T> {
 }
 
 impl<'a, T> Gc<'a, T> {
-    pub(crate) fn from_raw<'b>(ptr: *const GcBox<T>, magic: usize, _marker: PhantomData<*const &'b ()>) -> Gc<'b, T> {
+    pub(crate) fn from_raw<'b>(
+        ptr: *const GcBox<T>,
+        magic: usize,
+        _marker: PhantomData<*const &'b ()>,
+    ) -> Gc<'b, T> {
         let gc = Gc {
             _marker,
-            ptr: GcPtr {
-                ptr,
-                magic,
-            },
+            ptr: GcPtr { ptr, magic },
         };
         Gc::get_gc_box(&gc).incr_ref();
         gc
@@ -194,17 +195,18 @@ pub struct Weak<'arena, T> {
 
 impl<'a, T> Weak<'a, T> {
     pub fn upgrade(&self) -> Option<Gc<'a, T>> {
-        self.weak_ptr.get()
+        self.weak_ptr
+            .get()
             .map(|gc_box| Gc::from_raw(gc_box, 0, PhantomData))
-
     }
 
     pub fn is_alive(&self) -> bool {
         self.weak_ptr.is_alive()
     }
     pub fn get(&self) -> Option<&T> {
-        self.weak_ptr.get()
-            .map(|gc_box| unsafe {  (*gc_box).borrow() })
+        self.weak_ptr
+            .get()
+            .map(|gc_box| unsafe { (*gc_box).borrow() })
     }
 }
 
@@ -227,8 +229,7 @@ impl<'a, T> Safe<'a, T> {
     }
     pub(crate) fn box_ptr(&self) -> Option<*const GcBox<T>> {
         if self.is_alive() {
-            self._gc_marker.as_ref()
-                .map(|gc| Gc::box_ptr(gc))
+            self._gc_marker.as_ref().map(|gc| Gc::box_ptr(gc))
         } else {
             None
         }
@@ -236,7 +237,7 @@ impl<'a, T> Safe<'a, T> {
 }
 impl<'a, T> Drop for Safe<'a, T> {
     fn drop(&mut self) {
-        use std::mem::{replace, forget};
+        use std::mem::{forget, replace};
         println!("self living = {}", self.is_alive());
         if !self.is_alive() {
             println!("swapping");
@@ -251,10 +252,10 @@ impl<'a, T> Drop for Safe<'a, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ::*;
+    use *;
 
     #[inline(never)]
-    fn eat_stack_and_exec<T, F: FnOnce() -> T>(recurs: usize, callback: F) -> T{
+    fn eat_stack_and_exec<T, F: FnOnce() -> T>(recurs: usize, callback: F) -> T {
         let _nom = [22; 25];
         if recurs > 0 {
             eat_stack_and_exec(recurs - 1, callback)
@@ -276,7 +277,6 @@ mod tests {
             assert_eq!(get_ref_num(&num), 2);
             drop(num);
             assert_eq!(get_ref_num(&num2), 1);
-
         };
         unsafe { col.run_with_gc(body) };
     }
@@ -333,7 +333,6 @@ mod tests {
                 let num_safe = Gc::to_safe(num);
                 num_safe
             });
-
 
             proxy.run();
             assert_eq!(proxy.num_tracked(), 0);
