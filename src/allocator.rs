@@ -97,7 +97,7 @@ impl Drop for AllocInfo {
 }
 
 pub(crate) struct Allocator {
-    pub items: HashMap<NonNull<UntypedGcBox>, AllocInfo>,
+    pub items: HashMap<*mut UntypedGcBox, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
     // max_ptr: usize,
     // min_ptr: usize,
@@ -117,17 +117,17 @@ impl Allocator {
         // self.max_ptr = max(self.max_ptr, info.ptr as usize);
         // self.min_ptr = min(self.min_ptr, info.ptr as usize);
         let ptr = info.ptr;
-        self.items.insert(ptr, info);
+        self.items.insert(ptr.as_ptr(), info);
         ptr.cast::<GcBox<T>>()  // FIXME as_typed
     }
     pub fn free(&mut self, ptr: *const UntypedGcBox) {
-        let ptr = NonNull::new(ptr as *mut _).unwrap(); // FixMe NonNull
-        self.items.remove(&(ptr)); // Will be deallocated by Drop
+        let ptr = NonNull::new(ptr as *mut _).expect("ptr was null"); // FixMe NonNull
+        self.items.remove(&ptr.as_ptr()); // Will be deallocated by Drop
     }
     pub fn _remove<T>(&mut self, ptr: *const UntypedGcBox) -> T {
-        let map_ptr = NonNull::new(ptr as *mut _).unwrap(); // FixMe NonNull
+        let map_ptr = NonNull::new(ptr as *mut _).expect("ptr was null"); // FixMe NonNull
         use std::mem::forget;
-        let item = self.items.remove(&map_ptr);
+        let item = self.items.remove(&map_ptr.as_ptr());
         forget(item);
         let boxed: Box<GcBox<T>> = unsafe { Box::from_raw(ptr as *mut _) };
         boxed.reclaim_value()
@@ -145,8 +145,7 @@ impl Allocator {
     // }
 
     pub(crate) fn info_for_ptr(&self, ptr: *const UntypedGcBox) -> Option<&AllocInfo> {
-        let ptr = NonNull::new(ptr as *mut _).unwrap(); // FixMe NonNull
-        self.items.get(&ptr)
+        self.items.get(&(ptr as *mut _))
     }
 
     pub fn should_shrink_items(&self) -> bool {

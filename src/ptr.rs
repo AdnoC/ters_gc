@@ -220,7 +220,7 @@ impl<'a, T: 'a> Safe<'a, T> {
     pub fn to_unsafe(mut this: Safe<'a, T>) -> Gc<'a, T> {
         use std::mem::replace;
         let gc = replace(&mut this._gc_marker, None);
-        gc.unwrap()
+        gc.expect("convecsion from invalid Safe")
     }
     pub fn get(&self) -> Option<&T> {
         self.ptr.get()
