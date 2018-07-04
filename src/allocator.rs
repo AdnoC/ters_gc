@@ -4,7 +4,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use traceable::{TraceTo, Tracer};
 use UntypedGcBox;
-use ptr_convs::*;
+use {AsTyped, AsUntyped};
 
 trait AsConstPtr {
     type Target;
@@ -32,7 +32,7 @@ pub(crate) struct AllocInfo {
 impl AllocInfo {
     fn new<T: TraceTo>(value: T) -> AllocInfo {
         AllocInfo {
-            ptr: store_single_value(value).cast::<UntypedGcBox>(), // FIXME as_untyped
+            ptr: store_single_value(value).as_untyped(),
             rebox: get_rebox::<T>(),
             branches: Cell::new(0),
             roots: Cell::new(0),
@@ -118,18 +118,16 @@ impl Allocator {
         // self.min_ptr = min(self.min_ptr, info.ptr as usize);
         let ptr = info.ptr;
         self.items.insert(ptr.as_ptr(), info);
-        ptr.cast::<GcBox<T>>()  // FIXME as_typed
+        ptr.as_typed()
     }
-    pub fn free(&mut self, ptr: *const UntypedGcBox) {
-        let ptr = NonNull::new(ptr as *mut _).expect("ptr was null"); // FixMe NonNull
+    pub fn free(&mut self, ptr: NonNull<UntypedGcBox>) {
         self.items.remove(&ptr.as_ptr()); // Will be deallocated by Drop
     }
-    pub fn _remove<T>(&mut self, ptr: *const UntypedGcBox) -> T {
-        let map_ptr = NonNull::new(ptr as *mut _).expect("ptr was null"); // FixMe NonNull
+    pub fn _remove<T>(&mut self, ptr: NonNull<UntypedGcBox>) -> T {
         use std::mem::forget;
-        let item = self.items.remove(&map_ptr.as_ptr());
+        let item = self.items.remove(&ptr.as_ptr());
         forget(item);
-        let boxed: Box<GcBox<T>> = unsafe { Box::from_raw(ptr as *mut _) };
+        let boxed: Box<GcBox<T>> = unsafe { Box::from_raw(ptr.as_typed().as_ptr()) };
         boxed.reclaim_value()
     }
 
@@ -170,8 +168,8 @@ fn get_rebox<T>() -> fn(NonNull<UntypedGcBox>) {
 
 fn get_refs_accessor<T>() -> fn(NonNull<UntypedGcBox>) -> usize {
     |ptr: NonNull<UntypedGcBox>| unsafe {
-        let ptr = ptr.cast::<GcBox<T>>();
-        let gc_box = ptr.as_ref(); // FIXME as_typed
+        let ptr = ptr.as_typed();
+        let gc_box: &GcBox<T> = ptr.as_ref();
         gc_box.ref_count()
     }
 }
@@ -179,8 +177,8 @@ fn get_refs_accessor<T>() -> fn(NonNull<UntypedGcBox>) -> usize {
 fn get_tracer<T: TraceTo>() -> fn(NonNull<UntypedGcBox>) -> Tracer {
     |ptr: NonNull<UntypedGcBox>| unsafe {
         let mut tracer = Tracer::new();
-        let ptr = ptr.cast::<GcBox<T>>();
-        let gc_box = ptr.as_ref(); // FIXME as_typed
+        let ptr = ptr.as_typed();
+        let gc_box: &GcBox<T> = ptr.as_ref();
         gc_box.borrow().trace_to(&mut tracer);
         tracer
     }
@@ -275,7 +273,7 @@ mod tests {
         let mut alloc = Allocator::new();
         let counter = DtorCounter::new();
         let ptr = alloc.alloc(counter.incr());
-        alloc.free(ptr.cast::<UntypedGcBox>().as_const_ptr()); // FIXME as_untyped NonNull
+        alloc.free(ptr.as_untyped());
         assert_eq!(counter.count(), 1);
     }
 }

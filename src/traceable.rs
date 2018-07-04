@@ -1,6 +1,7 @@
 use ptr::{Gc, GcBox, Safe, Weak};
 use std::ptr::NonNull;
 use UntypedGcBox;
+use AsUntyped;
 
 // Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`.
 // Can act funny if you have Sp<Gc<T>> where Sp is a smart pointer that
@@ -22,7 +23,7 @@ impl Tracer {
         target.trace_to(self);
     }
     fn add_box<T>(&mut self, gc_box: NonNull<GcBox<T>>) {
-        self.targets.push(TraceDest(gc_box.cast())); // FIXME as_untyped
+        self.targets.push(TraceDest(gc_box.as_untyped()));
     }
     pub(crate) fn results(self) -> ::std::vec::IntoIter<TraceDest> {
         self.targets.into_iter()

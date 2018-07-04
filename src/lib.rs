@@ -22,46 +22,22 @@ use std::ptr::NonNull;
 use std::marker::PhantomData;
 use traceable::TraceTo;
 
-mod ptr_convs {
-    use ptr::GcBox;
-    use UntypedGcBox;
-
-    trait ConstAsUntyped {
-        fn as_untyped(&self) -> *const UntypedGcBox;
-    }
-    impl<T> ConstAsUntyped for *const GcBox<T> {
-        fn as_untyped(&self) -> *const UntypedGcBox {
-            (*self) as _
-        }
-    }
-    trait ConstAsTyped {
-        fn as_typed<T>(&self) -> *const GcBox<T>;
-    }
-    impl ConstAsTyped for *const UntypedGcBox {
-        fn as_typed<T>(&self) -> *const GcBox<T> {
-            (*self) as _
-        }
-    }
-
-
-    trait MutAsUntyped {
-        fn as_untyped(&self) -> *mut UntypedGcBox;
-    }
-    impl<T> MutAsUntyped for *mut GcBox<T> {
-        fn as_untyped(&self) -> *mut UntypedGcBox {
-            (*self) as _
-        }
-    }
-    trait MutAsTyped {
-        fn as_typed<T>(&self) -> *mut GcBox<T>;
-    }
-    impl MutAsTyped for *mut UntypedGcBox {
-        fn as_typed<T>(&self) -> *mut GcBox<T> {
-            (*self) as _
-        }
+trait AsTyped {
+    fn as_typed<T>(&self) -> NonNull<GcBox<T>>;
+}
+impl AsTyped for NonNull<UntypedGcBox> {
+    fn as_typed<T>(&self) -> NonNull<GcBox<T>> {
+        self.cast()
     }
 }
-use ptr_convs::*;
+trait AsUntyped {
+    fn as_untyped(&self) -> NonNull<UntypedGcBox>;
+}
+impl<T> AsUntyped for NonNull<GcBox<T>> {
+    fn as_untyped(&self) -> NonNull<UntypedGcBox> {
+        self.cast()
+    }
+}
 
 macro_rules! stack_ptr {
     () => {{
@@ -274,7 +250,7 @@ impl Collector {
         let mut unreachable_objects = vec![];
         for info in self.allocator.items.values_mut() {
             if !Self::is_object_reachable(info) {
-                unreachable_objects.push(info.const_ptr());
+                unreachable_objects.push(info.ptr);
             } else {
                 info.unmark();
             }
