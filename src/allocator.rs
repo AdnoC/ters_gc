@@ -1,14 +1,26 @@
 use ptr::GcBox;
+use std::ptr::NonNull;
 use std::cell::Cell;
 use std::collections::HashMap;
 use traceable::{TraceTo, Tracer};
 use UntypedGcBox;
-use {AsTyped, AsUntyped};
+use ptr_convs::*;
+
+trait AsConstPtr {
+    type Target;
+    fn as_const_ptr(&self) -> *const Self::Target;
+}
+impl<T> AsConstPtr for NonNull<T> {
+    type Target = T;
+    fn as_const_ptr(&self) -> *const T {
+        self.as_ptr() as *const _
+    }
+}
 
 // TODO: Make mark stats into Cell so that the marking functs can take &self
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
-    pub ptr: *const UntypedGcBox,
+    pub ptr: NonNull<UntypedGcBox>,
     rebox: fn(*const UntypedGcBox),
     branches: Cell<usize>, // # of marks from ptrs stored in tracked objects
     roots: Cell<usize>,    // # of marks from ptrs stored in stack (since we can't traverse heap)
@@ -20,7 +32,7 @@ pub(crate) struct AllocInfo {
 impl AllocInfo {
     fn new<T: TraceTo>(value: T) -> AllocInfo {
         AllocInfo {
-            ptr: store_single_value(value).as_untyped(),
+            ptr: store_single_value(value).cast::<UntypedGcBox>(), // FIXME as_untyped
             rebox: get_rebox::<T>(),
             branches: Cell::new(0),
             roots: Cell::new(0),
@@ -28,6 +40,9 @@ impl AllocInfo {
             refs: get_refs_accessor::<T>(),
             trace: get_tracer::<T>(),
         }
+    }
+    pub fn const_ptr(&self) -> *const UntypedGcBox{
+        self.ptr.as_const_ptr()
     }
 
     pub fn mark_branch(&self) {
@@ -66,18 +81,18 @@ impl AllocInfo {
     }
 
     pub fn ref_count(&self) -> usize {
-        (self.refs)(self.ptr)
+        (self.refs)(self.ptr.as_const_ptr())
     }
 
     pub(crate) fn children(&self) -> impl Iterator<Item = *const UntypedGcBox> {
-        let tracer = (self.trace)(self.ptr);
+        let tracer = (self.trace)(self.ptr.as_const_ptr());
         tracer.results().map(|dest| dest.0)
     }
 }
 
 impl Drop for AllocInfo {
     fn drop(&mut self) {
-        (self.rebox)(self.ptr);
+        (self.rebox)(self.ptr.as_const_ptr());
     }
 }
 
@@ -101,9 +116,9 @@ impl Allocator {
         let info = AllocInfo::new(value);
         // self.max_ptr = max(self.max_ptr, info.ptr as usize);
         // self.min_ptr = min(self.min_ptr, info.ptr as usize);
-        let ptr = info.ptr;
+        let ptr = info.ptr.as_const_ptr();
         self.items.insert(ptr, info);
-        ptr.as_typed()
+        ptr as *const _ // FIXME as_typed
     }
     pub fn free(&mut self, ptr: *const UntypedGcBox) {
         self.items.remove(&(ptr)); // Will be deallocated by Drop
@@ -138,9 +153,9 @@ impl Allocator {
     pub fn shrink_items(&mut self) {}
 }
 
-fn store_single_value<T>(value: T) -> *const GcBox<T> {
+fn store_single_value<T>(value: T) -> NonNull<GcBox<T>> {
     let storage = Box::new(GcBox::new(value));
-    Box::leak(storage)
+    unsafe { NonNull::new_unchecked(Box::leak(storage)) }
 }
 
 fn get_rebox<T>() -> fn(*const UntypedGcBox) {
@@ -153,7 +168,7 @@ fn get_rebox<T>() -> fn(*const UntypedGcBox) {
 
 fn get_refs_accessor<T>() -> fn(*const UntypedGcBox) -> usize {
     |ptr: *const UntypedGcBox| unsafe {
-        let gc_box: &GcBox<T> = &*(ptr.as_typed());
+        let gc_box: &GcBox<T> = &*(ptr as *const _); // FIXME as_typed
         gc_box.ref_count()
     }
 }
@@ -161,7 +176,7 @@ fn get_refs_accessor<T>() -> fn(*const UntypedGcBox) -> usize {
 fn get_tracer<T: TraceTo>() -> fn(*const UntypedGcBox) -> Tracer {
     |ptr: *const UntypedGcBox| unsafe {
         let mut tracer = Tracer::new();
-        let gc_box: &GcBox<T> = &*(ptr.as_typed());
+        let gc_box: &GcBox<T> = &*(ptr as *const _); // FIXME as_typed
         gc_box.borrow().trace_to(&mut tracer);
         tracer
     }

@@ -21,22 +21,46 @@ use ptr::GcBox;
 use std::marker::PhantomData;
 use traceable::TraceTo;
 
-trait AsUntyped {
-    fn as_untyped(&self) -> *const UntypedGcBox;
-}
-impl<T> AsUntyped for *const GcBox<T> {
-    fn as_untyped(&self) -> *const UntypedGcBox {
-        (*self) as _
+mod ptr_convs {
+    use ptr::GcBox;
+    use UntypedGcBox;
+
+    trait ConstAsUntyped {
+        fn as_untyped(&self) -> *const UntypedGcBox;
+    }
+    impl<T> ConstAsUntyped for *const GcBox<T> {
+        fn as_untyped(&self) -> *const UntypedGcBox {
+            (*self) as _
+        }
+    }
+    trait ConstAsTyped {
+        fn as_typed<T>(&self) -> *const GcBox<T>;
+    }
+    impl ConstAsTyped for *const UntypedGcBox {
+        fn as_typed<T>(&self) -> *const GcBox<T> {
+            (*self) as _
+        }
+    }
+
+
+    trait MutAsUntyped {
+        fn as_untyped(&self) -> *mut UntypedGcBox;
+    }
+    impl<T> MutAsUntyped for *mut GcBox<T> {
+        fn as_untyped(&self) -> *mut UntypedGcBox {
+            (*self) as _
+        }
+    }
+    trait MutAsTyped {
+        fn as_typed<T>(&self) -> *mut GcBox<T>;
+    }
+    impl MutAsTyped for *mut UntypedGcBox {
+        fn as_typed<T>(&self) -> *mut GcBox<T> {
+            (*self) as _
+        }
     }
 }
-trait AsTyped {
-    fn as_typed<T>(&self) -> *const GcBox<T>;
-}
-impl AsTyped for *const UntypedGcBox {
-    fn as_typed<T>(&self) -> *const GcBox<T> {
-        (*self) as _
-    }
-}
+use ptr_convs::*;
 
 macro_rules! stack_ptr {
     () => {{
@@ -125,12 +149,12 @@ impl Collector {
             .values()
             .filter(|info| !info.is_marked_reachable());
         for info in unreachable_objects.clone() {
-            self.mark_island_ptr(info.ptr);
+            self.mark_island_ptr(info.const_ptr());
         }
 
         let heap_objects = unreachable_objects.filter(|info| Self::is_object_reachable(info));
         for info in heap_objects {
-            self.mark_newly_found_ptr(info.ptr);
+            self.mark_newly_found_ptr(info.const_ptr());
         }
     }
 
@@ -249,7 +273,7 @@ impl Collector {
         let mut unreachable_objects = vec![];
         for info in self.allocator.items.values_mut() {
             if !Self::is_object_reachable(info) {
-                unreachable_objects.push(info.ptr);
+                unreachable_objects.push(info.const_ptr());
             } else {
                 info.unmark();
             }
