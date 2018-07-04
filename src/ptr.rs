@@ -1,5 +1,6 @@
 use std::cell::Cell;
 use std::cell::RefCell;
+use std::ptr::NonNull;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -111,17 +112,20 @@ impl<T> TrackingRef<T> {
 }
 
 #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
-pub struct Gc<'arena, T> {
-    _marker: PhantomData<*const &'arena ()>,
-    ptr: *const GcBox<T>, // TODO Make NonNull<GcBox<T>>
+pub struct Gc<'arena, T: 'arena> {
+    _marker: PhantomData<&'arena mut T>,
+    ptr: NonNull<GcBox<T>>, // TODO Make NonNull<GcBox<T>>
 }
 
-impl<'a, T> Gc<'a, T> {
+impl<'a, T: 'a> Gc<'a, T> {
     pub(crate) fn from_raw<'b>(
-        ptr: *const GcBox<T>,
-        _marker: PhantomData<*const &'b ()>,
+        ptr: *mut GcBox<T>,
+        _marker: PhantomData<&'b mut T>,
     ) -> Gc<'b, T> {
-        let gc = Gc { _marker, ptr };
+        let gc = Gc {
+            _marker,
+            ptr: NonNull::new(ptr).expect("created Gc from null ptr"),
+        };
         Gc::get_gc_box(&gc).incr_ref();
         gc
     }
@@ -132,8 +136,8 @@ impl<'a, T> Gc<'a, T> {
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
     }
-    pub(crate) fn box_ptr(this: &Gc<'a, T>) -> *const GcBox<T> {
-        this.ptr
+    pub(crate) fn box_ptr(this: &Gc<'a, T>) -> *mut GcBox<T> {
+        this.ptr.as_ptr()
     }
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {
@@ -152,19 +156,19 @@ impl<'a, T> Gc<'a, T> {
         Safe::to_unsafe(this)
     }
 }
-impl<'a, T> Deref for Gc<'a, T> {
+impl<'a, T: 'a> Deref for Gc<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
         Gc::get_gc_box(self).borrow()
     }
 }
-impl<'a, T> Drop for Gc<'a, T> {
+impl<'a, T: 'a> Drop for Gc<'a, T> {
     fn drop(&mut self) {
         Gc::get_gc_box(self).decr_ref();
     }
 }
-impl<'a, T> Clone for Gc<'a, T> {
+impl<'a, T: 'a> Clone for Gc<'a, T> {
     fn clone(&self) -> Self {
         let gc = Gc {
             _marker: PhantomData,
@@ -176,16 +180,16 @@ impl<'a, T> Clone for Gc<'a, T> {
 }
 
 #[derive(Clone)]
-pub struct Weak<'arena, T> {
+pub struct Weak<'arena, T: 'arena> {
     _marker: PhantomData<*const &'arena ()>,
     weak_ptr: TrackingRef<T>,
 }
 
-impl<'a, T> Weak<'a, T> {
+impl<'a, T: 'a> Weak<'a, T> {
     pub fn upgrade(&self) -> Option<Gc<'a, T>> {
         self.weak_ptr
             .get()
-            .map(|gc_box| Gc::from_raw(gc_box, PhantomData))
+            .map(|gc_box| Gc::from_raw(gc_box as *mut _, PhantomData)) // FIXME NonNull conversion
     }
 
     pub fn is_alive(&self) -> bool {
@@ -199,11 +203,11 @@ impl<'a, T> Weak<'a, T> {
 }
 
 #[derive(Clone)]
-pub struct Safe<'arena, T> {
+pub struct Safe<'arena, T: 'arena> {
     _gc_marker: Option<Gc<'arena, T>>,
     ptr: Weak<'arena, T>,
 }
-impl<'a, T> Safe<'a, T> {
+impl<'a, T: 'a> Safe<'a, T> {
     pub fn to_unsafe(mut this: Safe<'a, T>) -> Gc<'a, T> {
         use std::mem::replace;
         let gc = replace(&mut this._gc_marker, None);
@@ -217,13 +221,13 @@ impl<'a, T> Safe<'a, T> {
     }
     pub(crate) fn box_ptr(&self) -> Option<*const GcBox<T>> {
         if self.is_alive() {
-            self._gc_marker.as_ref().map(|gc| Gc::box_ptr(gc))
+            self._gc_marker.as_ref().map(|gc| Gc::box_ptr(gc) as *const _) // FIXME NonNull conversion
         } else {
             None
         }
     }
 }
-impl<'a, T> Drop for Safe<'a, T> {
+impl<'a, T: 'a> Drop for Safe<'a, T> {
     fn drop(&mut self) {
         use std::mem::{forget, replace};
         println!("self living = {}", self.is_alive());

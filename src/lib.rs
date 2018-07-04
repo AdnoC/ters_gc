@@ -301,7 +301,7 @@ pub struct Proxy<'arena> {
 impl<'a> Proxy<'a> {
     pub fn store<T: TraceTo>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
-        Gc::from_raw(ptr, PhantomData)
+        Gc::from_raw(ptr as *mut _, PhantomData) // FIXME: After NonNull conversion
     }
 
     pub fn run(&mut self) {
