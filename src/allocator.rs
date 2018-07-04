@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::cell::Cell;
 use ::ptr::GcBox;
 use UntypedGcBox;
 use traceable::{TraceTo, Tracer};
@@ -10,9 +11,9 @@ use {AsUntyped, AsTyped};
 pub(crate) struct AllocInfo {
     pub ptr: *const UntypedGcBox,
     rebox: fn(*const UntypedGcBox),
-    branches: usize, // # of marks from ptrs stored in tracked objects
-    roots: usize, // # of marks from ptrs stored in stack (since we can't traverse heap)
-    isolated: usize, // # of marks from objects for which is_marked_reachable == false
+    branches: Cell<usize>, // # of marks from ptrs stored in tracked objects
+    roots: Cell<usize>, // # of marks from ptrs stored in stack (since we can't traverse heap)
+    isolated: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
     refs: fn(*const UntypedGcBox) -> usize,
     trace: fn(*const UntypedGcBox) -> Tracer,
     size: usize,
@@ -24,9 +25,9 @@ impl AllocInfo {
         AllocInfo {
             ptr: store_single_value(value).as_untyped(),
             rebox: get_rebox::<T>(),
-            branches: 0,
-            roots: 0,
-            isolated: 0,
+            branches: Cell::new(0),
+            roots: Cell::new(0),
+            isolated: Cell::new(0),
             refs: get_refs_accessor::<T>(),
             trace: get_tracer::<T>(),
             size: size_of::<T>(),
@@ -34,38 +35,38 @@ impl AllocInfo {
     }
 
     pub fn mark_branch(&mut self) {
-        self.branches += 1;
+        self.branches.set(self.branches.get() + 1);
     }
     pub fn mark_root(&mut self) {
-        self.roots += 1;
+        self.roots.set(self.roots.get() + 1);
     }
     pub fn mark_isolated(&mut self) {
-        self.isolated += 1;
+        self.isolated.set(self.isolated.get() + 1);
     }
     pub fn unmark_isolated(&mut self) {
-        self.isolated -= 1;
+        self.isolated.set(self.isolated.get() - 1);
     }
 
     pub fn unmark(&mut self) {
-        self.branches = 0;
-        self.roots = 0;
-        self.isolated = 0;
+        self.branches.set(0);
+        self.roots.set(0);
+        self.isolated.set(0);
     }
 
     pub fn is_marked_reachable(&self) -> bool {
-        self.branches > 0 || self.roots > 0
+        self.branches.get() > 0 || self.roots.get() > 0
     }
 
     pub fn root_marks(&self) -> usize {
-        self.roots
+        self.roots.get()
     }
 
     pub fn branch_marks(&self) -> usize {
-        self.branches
+        self.branches.get()
     }
 
     pub fn isolated_marks(&self) -> usize {
-        self.isolated
+        self.isolated.get()
     }
 
     pub fn ref_count(&self) -> usize {
