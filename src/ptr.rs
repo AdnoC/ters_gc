@@ -113,14 +113,14 @@ impl<T> TrackingRef<T> {
 
 #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
 pub struct Gc<'arena, T: 'arena> {
-    _marker: PhantomData<&'arena mut T>,
+    _marker: PhantomData<&'arena T>,
     ptr: NonNull<GcBox<T>>, // TODO Make NonNull<GcBox<T>>
 }
 
 impl<'a, T: 'a> Gc<'a, T> {
     pub(crate) fn from_raw(
         ptr: *mut GcBox<T>,
-        _marker: PhantomData<&'a mut T>,
+        _marker: PhantomData<&'a T>,
     ) -> Gc<'a, T> {
         let gc = Gc {
             _marker,
@@ -130,14 +130,14 @@ impl<'a, T: 'a> Gc<'a, T> {
         gc
     }
 
-    fn get_gc_box<'b>(this: &'b Gc<'a, T>) -> &'b GcBox<T> {
-        unsafe { &*Self::box_ptr(this) }
+    fn get_gc_box<'t>(this: &'t Gc<'a, T>) -> &'t GcBox<T> {
+        unsafe { this.ptr.as_ref() }
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
     }
-    pub(crate) fn box_ptr(this: &Gc<'a, T>) -> *mut GcBox<T> {
-        this.ptr.as_ptr()
+    pub(crate) fn box_ptr(this: &Gc<'a, T>) -> NonNull<GcBox<T>> {
+        this.ptr
     }
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {
@@ -219,9 +219,9 @@ impl<'a, T: 'a> Safe<'a, T> {
     pub fn is_alive(&self) -> bool {
         self.ptr.is_alive()
     }
-    pub(crate) fn box_ptr(&self) -> Option<*const GcBox<T>> {
+    pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
         if self.is_alive() {
-            self._gc_marker.as_ref().map(|gc| Gc::box_ptr(gc) as *const _) // FIXME NonNull conversion
+            self._gc_marker.as_ref().map(|gc| Gc::box_ptr(gc)) // FIXME NonNull conversion
         } else {
             None
         }
