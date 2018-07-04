@@ -47,8 +47,6 @@ macro_rules! stack_ptr {
 
 struct StackPtr(*const usize);
 
-const MAGIC: usize = 0x3d4a825;
-
 pub struct Collector {
     allocator: Allocator,
     collection_threshold: usize,
@@ -56,7 +54,6 @@ pub struct Collector {
     sweep_factor: f64,
     paused: bool,
     stack_bottom: StackPtr,
-    magic: usize,
 }
 
 impl Collector {
@@ -71,7 +68,6 @@ impl Collector {
             // which sets it to a valid value.
             // TODO: MAKE THIS THE CASE
             stack_bottom: StackPtr(0 as *const _),
-            magic: MAGIC, // TODO: Make random
         }
     }
 
@@ -305,7 +301,7 @@ pub struct Proxy<'arena> {
 impl<'a> Proxy<'a> {
     pub fn store<T: TraceTo>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
-        Gc::from_raw(ptr, self.collector.magic, PhantomData)
+        Gc::from_raw(ptr, PhantomData)
     }
 
     pub fn run(&mut self) {

@@ -110,39 +110,33 @@ impl<T> TrackingRef<T> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct GcPtr<T> {
-    ptr: *const GcBox<T>, // TODO Make NonNull<GcBox<T>>
-    magic: usize,
-}
 #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
 pub struct Gc<'arena, T> {
     _marker: PhantomData<*const &'arena ()>,
-    ptr: GcPtr<T>,
+    ptr: *const GcBox<T>, // TODO Make NonNull<GcBox<T>>
 }
 
 impl<'a, T> Gc<'a, T> {
     pub(crate) fn from_raw<'b>(
         ptr: *const GcBox<T>,
-        magic: usize,
         _marker: PhantomData<*const &'b ()>,
     ) -> Gc<'b, T> {
         let gc = Gc {
             _marker,
-            ptr: GcPtr { ptr, magic },
+            ptr,
         };
         Gc::get_gc_box(&gc).incr_ref();
         gc
     }
 
     fn get_gc_box<'b>(this: &'b Gc<'a, T>) -> &'b GcBox<T> {
-        unsafe { &*this.ptr.ptr }
+        unsafe { &* Self::box_ptr(this) }
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
     }
     pub(crate) fn box_ptr(this: &Gc<'a, T>) -> *const GcBox<T> {
-        this.ptr.ptr
+        this.ptr
     }
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {
@@ -177,10 +171,7 @@ impl<'a, T> Clone for Gc<'a, T> {
     fn clone(&self) -> Self {
         let gc = Gc {
             _marker: PhantomData,
-            ptr: GcPtr {
-                ptr: self.ptr.ptr,
-                magic: self.ptr.magic,
-            },
+            ptr: self.ptr,
         };
         Gc::get_gc_box(&gc).incr_ref();
         gc
@@ -197,7 +188,7 @@ impl<'a, T> Weak<'a, T> {
     pub fn upgrade(&self) -> Option<Gc<'a, T>> {
         self.weak_ptr
             .get()
-            .map(|gc_box| Gc::from_raw(gc_box, 0, PhantomData))
+            .map(|gc_box| Gc::from_raw(gc_box, PhantomData))
     }
 
     pub fn is_alive(&self) -> bool {
