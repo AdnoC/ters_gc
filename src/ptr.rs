@@ -118,10 +118,10 @@ pub struct Gc<'arena, T: 'arena> {
 }
 
 impl<'a, T: 'a> Gc<'a, T> {
-    pub(crate) fn from_raw<'b>(
+    pub(crate) fn from_raw(
         ptr: *mut GcBox<T>,
-        _marker: PhantomData<&'b mut T>,
-    ) -> Gc<'b, T> {
+        _marker: PhantomData<&'a mut T>,
+    ) -> Gc<'a, T> {
         let gc = Gc {
             _marker,
             ptr: NonNull::new(ptr).expect("created Gc from null ptr"),
