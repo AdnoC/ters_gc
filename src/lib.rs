@@ -18,6 +18,7 @@ use allocator::AllocInfo;
 use allocator::Allocator;
 pub use ptr::Gc;
 use ptr::GcBox;
+use std::ptr::NonNull;
 use std::marker::PhantomData;
 use traceable::TraceTo;
 
@@ -108,7 +109,7 @@ impl Collector {
         func(proxy)
     }
 
-    fn alloc<T: TraceTo>(&mut self, val: T) -> *const GcBox<T> {
+    fn alloc<T: TraceTo>(&mut self, val: T) -> NonNull<GcBox<T>> {
         if self.should_collect() {
             self.run();
         }
@@ -325,7 +326,7 @@ pub struct Proxy<'arena> {
 impl<'a> Proxy<'a> {
     pub fn store<T: TraceTo>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
-        Gc::from_raw(ptr as *mut _, PhantomData) // FIXME: After NonNull conversion
+        Gc::from_raw_nonnull(ptr, PhantomData)
     }
 
     pub fn run(&mut self) {

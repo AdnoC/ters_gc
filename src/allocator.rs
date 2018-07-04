@@ -97,7 +97,7 @@ impl Drop for AllocInfo {
 }
 
 pub(crate) struct Allocator {
-    pub items: HashMap<*const UntypedGcBox, AllocInfo>,
+    pub items: HashMap<NonNull<UntypedGcBox>, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
     // max_ptr: usize,
     // min_ptr: usize,
@@ -111,21 +111,23 @@ impl Allocator {
             // min_ptr: ::std::usize::MAX,
         }
     }
-    pub fn alloc<T: TraceTo>(&mut self, value: T) -> *const GcBox<T> {
+    pub fn alloc<T: TraceTo>(&mut self, value: T) -> NonNull<GcBox<T>> {
         // use std::cmp::{min, max};
         let info = AllocInfo::new(value);
         // self.max_ptr = max(self.max_ptr, info.ptr as usize);
         // self.min_ptr = min(self.min_ptr, info.ptr as usize);
-        let ptr = info.ptr.as_const_ptr();
+        let ptr = info.ptr;
         self.items.insert(ptr, info);
-        ptr as *const _ // FIXME as_typed
+        ptr.cast::<GcBox<T>>()  // FIXME as_typed
     }
     pub fn free(&mut self, ptr: *const UntypedGcBox) {
+        let ptr = NonNull::new(ptr as *mut _).unwrap(); // FixMe NonNull
         self.items.remove(&(ptr)); // Will be deallocated by Drop
     }
     pub fn _remove<T>(&mut self, ptr: *const UntypedGcBox) -> T {
+        let map_ptr = NonNull::new(ptr as *mut _).unwrap(); // FixMe NonNull
         use std::mem::forget;
-        let item = self.items.remove(&ptr);
+        let item = self.items.remove(&map_ptr);
         forget(item);
         let boxed: Box<GcBox<T>> = unsafe { Box::from_raw(ptr as *mut _) };
         boxed.reclaim_value()
@@ -143,6 +145,7 @@ impl Allocator {
     // }
 
     pub(crate) fn info_for_ptr(&self, ptr: *const UntypedGcBox) -> Option<&AllocInfo> {
+        let ptr = NonNull::new(ptr as *mut _).unwrap(); // FixMe NonNull
         self.items.get(&ptr)
     }
 
@@ -273,7 +276,7 @@ mod tests {
         let mut alloc = Allocator::new();
         let counter = DtorCounter::new();
         let ptr = alloc.alloc(counter.incr());
-        alloc.free(ptr as *const _); // FIXME as_untyped
+        alloc.free(ptr.cast::<UntypedGcBox>().as_const_ptr()); // FIXME as_untyped NonNull
         assert_eq!(counter.count(), 1);
     }
 }
