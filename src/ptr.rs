@@ -121,16 +121,13 @@ impl<'a, T> Gc<'a, T> {
         ptr: *const GcBox<T>,
         _marker: PhantomData<*const &'b ()>,
     ) -> Gc<'b, T> {
-        let gc = Gc {
-            _marker,
-            ptr,
-        };
+        let gc = Gc { _marker, ptr };
         Gc::get_gc_box(&gc).incr_ref();
         gc
     }
 
     fn get_gc_box<'b>(this: &'b Gc<'a, T>) -> &'b GcBox<T> {
-        unsafe { &* Self::box_ptr(this) }
+        unsafe { &*Self::box_ptr(this) }
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
