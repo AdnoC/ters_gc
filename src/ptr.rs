@@ -4,10 +4,15 @@ use std::ptr::NonNull;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
-pub(crate) struct GcBox<T> {
-    val: T,
+
+
+/// TODO: Send & Sync safety
+
+
+pub(crate) struct GcBox<T: ?Sized> {
     refs: Cell<usize>,
     coroner: Coroner<T>,
+    val: T, // TODO: Why does this fail if it is first in list?
 }
 
 impl<T> GcBox<T> {
@@ -18,6 +23,11 @@ impl<T> GcBox<T> {
             coroner: Coroner::new(),
         }
     }
+    pub fn reclaim_value(self) -> T {
+        self.val
+    }
+}
+impl<T: ?Sized> GcBox<T> {
     pub fn incr_ref(&self) {
         self.refs.set(self.refs.get() + 1);
     }
@@ -30,9 +40,6 @@ impl<T> GcBox<T> {
     pub fn borrow(&self) -> &T {
         &self.val
     }
-    pub fn reclaim_value(self) -> T {
-        self.val
-    }
 
     fn tracking_ref(&self) -> TrackingRef<T> {
         if !self.coroner.is_tracking() {
@@ -44,15 +51,15 @@ impl<T> GcBox<T> {
     }
 }
 
-struct Coroner<T>(RefCell<Option<LifeTracker<T>>>);
-impl<T> Drop for Coroner<T> {
+struct Coroner<T: ?Sized>(RefCell<Option<LifeTracker<T>>>);
+impl<T: ?Sized> Drop for Coroner<T> {
     fn drop(&mut self) {
         if let Some(ref tracker) = *self.0.borrow() {
             tracker.dead();
         }
     }
 }
-impl<T> Coroner<T> {
+impl<T: ?Sized> Coroner<T> {
     fn new() -> Coroner<T> {
         Coroner(RefCell::new(None))
     }
@@ -69,8 +76,8 @@ impl<T> Coroner<T> {
     }
 }
 
-struct LifeTracker<T>(Rc<TrackingInfo<T>>);
-impl<T> LifeTracker<T> {
+struct LifeTracker<T: ?Sized>(Rc<TrackingInfo<T>>);
+impl<T: ?Sized> LifeTracker<T> {
     fn new(target: *const GcBox<T>) -> LifeTracker<T> {
         LifeTracker(Rc::new(TrackingInfo {
             alive: Cell::new(true),
@@ -85,20 +92,20 @@ impl<T> LifeTracker<T> {
         self.0.alive.set(false);
     }
 }
-impl<T> Clone for LifeTracker<T> {
+impl<T: ?Sized> Clone for LifeTracker<T> {
     fn clone(&self) -> Self {
         LifeTracker(self.0.clone())
     }
 }
 #[derive(Clone)]
-struct TrackingInfo<T> {
+struct TrackingInfo<T: ?Sized> {
     alive: Cell<bool>,
     target: *const GcBox<T>,
 }
 
 #[derive(Clone)]
-struct TrackingRef<T>(LifeTracker<T>);
-impl<T> TrackingRef<T> {
+struct TrackingRef<T: ?Sized>(LifeTracker<T>);
+impl<T: ?Sized> TrackingRef<T> {
     fn is_alive(&self) -> bool {
         self.0.is_alive()
     }
@@ -112,12 +119,12 @@ impl<T> TrackingRef<T> {
 }
 
 #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
-pub struct Gc<'arena, T: 'arena> {
+pub struct Gc<'arena, T: ?Sized + 'arena> {
     _marker: PhantomData<&'arena T>,
     ptr: NonNull<GcBox<T>>, // TODO Make NonNull<GcBox<T>>
 }
 
-impl<'a, T: 'a> Gc<'a, T> {
+impl<'a, T: ?Sized + 'a> Gc<'a, T> {
     pub(crate) fn from_raw_nonnull(
         ptr: NonNull<GcBox<T>>,
         _marker: PhantomData<&'a T>,
@@ -165,19 +172,19 @@ impl<'a, T: 'a> Gc<'a, T> {
         Safe::to_unsafe(this)
     }
 }
-impl<'a, T: 'a> Deref for Gc<'a, T> {
+impl<'a, T: ?Sized + 'a> Deref for Gc<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
         Gc::get_gc_box(self).borrow()
     }
 }
-impl<'a, T: 'a> Drop for Gc<'a, T> {
+impl<'a, T: ?Sized + 'a> Drop for Gc<'a, T> {
     fn drop(&mut self) {
         Gc::get_gc_box(self).decr_ref();
     }
 }
-impl<'a, T: 'a> Clone for Gc<'a, T> {
+impl<'a, T: ?Sized + 'a> Clone for Gc<'a, T> {
     fn clone(&self) -> Self {
         let gc = Gc {
             _marker: PhantomData,
@@ -189,12 +196,12 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
 }
 
 #[derive(Clone)]
-pub struct Weak<'arena, T: 'arena> {
+pub struct Weak<'arena, T: ?Sized + 'arena> {
     _marker: PhantomData<*const &'arena ()>,
     weak_ptr: TrackingRef<T>,
 }
 
-impl<'a, T: 'a> Weak<'a, T> {
+impl<'a, T: ?Sized + 'a> Weak<'a, T> {
     pub fn upgrade(&self) -> Option<Gc<'a, T>> {
         self.weak_ptr
             .get()
@@ -212,11 +219,11 @@ impl<'a, T: 'a> Weak<'a, T> {
 }
 
 #[derive(Clone)]
-pub struct Safe<'arena, T: 'arena> {
+pub struct Safe<'arena, T: ?Sized + 'arena> {
     _gc_marker: Option<Gc<'arena, T>>,
     ptr: Weak<'arena, T>,
 }
-impl<'a, T: 'a> Safe<'a, T> {
+impl<'a, T: ?Sized + 'a> Safe<'a, T> {
     pub fn to_unsafe(mut this: Safe<'a, T>) -> Gc<'a, T> {
         use std::mem::replace;
         let gc = replace(&mut this._gc_marker, None);
@@ -236,7 +243,7 @@ impl<'a, T: 'a> Safe<'a, T> {
         }
     }
 }
-impl<'a, T: 'a> Drop for Safe<'a, T> {
+impl<'a, T: ?Sized + 'a> Drop for Safe<'a, T> {
     fn drop(&mut self) {
         use std::mem::{forget, replace};
         println!("self living = {}", self.is_alive());
@@ -341,5 +348,10 @@ mod tests {
         };
 
         unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn store_unsized_types() {
+        // TODO
     }
 }
