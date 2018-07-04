@@ -42,9 +42,11 @@ impl AsTyped for *const UntypedGcBox {
 macro_rules! stack_ptr {
     () => {{
         let a = 0usize; // usize so that it is aligned
-        (&a) as *const _ as *const ()
+        StackPtr(&a)
     }};
 }
+
+struct StackPtr(*const usize);
 
 const MAGIC: usize = 0x3d4a825;
 
@@ -54,7 +56,7 @@ pub struct Collector {
     // load_factor: f64,
     sweep_factor: f64,
     paused: bool,
-    stack_bottom: *const (),
+    stack_bottom: StackPtr,
     magic: usize,
 }
 
@@ -66,7 +68,10 @@ impl Collector {
             // load_factor: 0.9,
             sweep_factor: 0.5,
             paused: false,
-            stack_bottom: 0 as *const (),
+            // This is ok since it is only used within a `run_with_gc` call,
+            // which sets it to a valid value.
+            // TODO: MAKE THIS THE CASE
+            stack_bottom: StackPtr(0 as *const _),
             magic: MAGIC, // TODO: Make random
         }
     }
@@ -113,7 +118,7 @@ impl Collector {
         collector.mark_impl(stack_top);
     }
 
-    fn mark_impl(&self, stack_top: *const ()) {
+    fn mark_impl(&self, stack_top: StackPtr) {
         self.mark_stack(stack_top);
         self.mark_in_gc();
     }
@@ -133,11 +138,13 @@ impl Collector {
     }
 
     #[inline(never)]
-    fn mark_stack(&self, stack_top: *const ()) {
+    fn mark_stack(&self, stack_top: StackPtr) {
         use std::mem::size_of;
 
-        let top = stack_top as usize;
-        let bottom = self.stack_bottom as usize;
+        // Since top and bottom are ptrs to a `usize`, they are
+        // garunteed to have the correct alignment.
+        let top = stack_top.0 as usize;
+        let bottom = self.stack_bottom.0 as usize;
         let (top, bottom) = if top < bottom {
             (bottom, top)
         } else {
@@ -156,7 +163,6 @@ impl Collector {
     }
 
     fn mark_ptr(&self, ptr: *const UntypedGcBox, root: bool) {
-        println!("Marking ptr {}", ptr as usize);
         if !self.allocator.is_ptr_in_range(ptr) {
             return;
         }
