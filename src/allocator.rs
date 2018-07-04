@@ -34,20 +34,20 @@ impl AllocInfo {
         }
     }
 
-    pub fn mark_branch(&mut self) {
+    pub fn mark_branch(&self) {
         self.branches.set(self.branches.get() + 1);
     }
-    pub fn mark_root(&mut self) {
+    pub fn mark_root(&self) {
         self.roots.set(self.roots.get() + 1);
     }
-    pub fn mark_isolated(&mut self) {
+    pub fn mark_isolated(&self) {
         self.isolated.set(self.isolated.get() + 1);
     }
-    pub fn unmark_isolated(&mut self) {
+    pub fn unmark_isolated(&self) {
         self.isolated.set(self.isolated.get() - 1);
     }
 
-    pub fn unmark(&mut self) {
+    pub fn unmark(&self) {
         self.branches.set(0);
         self.roots.set(0);
         self.isolated.set(0);
@@ -167,6 +167,9 @@ impl Allocator {
     //     self.items.contains_key(&ptr)
     // }
 
+    pub(crate) fn info_for_ptr(&self, ptr: *const UntypedGcBox) -> Option<&AllocInfo> {
+        self.items.get(&ptr)
+    }
     pub(crate) fn info_for_ptr_mut(&mut self, ptr: *const UntypedGcBox) -> Option<&mut AllocInfo> {
         self.items.get_mut(&ptr)
     }
