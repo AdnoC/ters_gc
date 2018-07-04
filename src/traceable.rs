@@ -1,4 +1,5 @@
 use ptr::{Gc, GcBox, Safe, Weak};
+use std::ptr::NonNull;
 use UntypedGcBox;
 
 // Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`.
@@ -7,7 +8,7 @@ use UntypedGcBox;
 pub trait TraceTo {
     fn trace_to(&self, tracer: &mut Tracer);
 }
-pub(crate) struct TraceDest(pub *const UntypedGcBox);
+pub(crate) struct TraceDest(pub NonNull<UntypedGcBox>);
 
 pub struct Tracer {
     targets: Vec<TraceDest>,
@@ -20,8 +21,8 @@ impl Tracer {
     pub fn add_target<T: TraceTo>(&mut self, target: &T) {
         target.trace_to(self);
     }
-    fn add_box<T>(&mut self, gc_box: *const GcBox<T>) {
-        self.targets.push(TraceDest(gc_box as *const _));
+    fn add_box<T>(&mut self, gc_box: NonNull<GcBox<T>>) {
+        self.targets.push(TraceDest(gc_box.cast())); // FIXME as_untyped
     }
     pub(crate) fn results(self) -> ::std::vec::IntoIter<TraceDest> {
         self.targets.into_iter()
@@ -37,14 +38,14 @@ impl<T> TraceTo for NoTrace<T> {
 
 impl<'a, T> TraceTo for Gc<'a, T> {
     fn trace_to(&self, tracer: &mut Tracer) {
-        tracer.add_box(Gc::box_ptr(self).as_ptr() as *const _); // FIXME NonNull conv
+        tracer.add_box(Gc::box_ptr(self));
     }
 }
 
 impl<'a, T> TraceTo for Safe<'a, T> {
     fn trace_to(&self, tracer: &mut Tracer) {
         if let Some(box_ptr) = self.box_ptr() {
-            tracer.add_box(box_ptr.as_ptr() as *const _); // FIXME NonNull conv
+            tracer.add_box(box_ptr);
         }
     }
 }

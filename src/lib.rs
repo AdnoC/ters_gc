@@ -150,12 +150,12 @@ impl Collector {
             .values()
             .filter(|info| !info.is_marked_reachable());
         for info in unreachable_objects.clone() {
-            self.mark_island_ptr(info.const_ptr());
+            self.mark_island_ptr(info.ptr);
         }
 
         let heap_objects = unreachable_objects.filter(|info| Self::is_object_reachable(info));
         for info in heap_objects {
-            self.mark_newly_found_ptr(info.const_ptr());
+            self.mark_newly_found_ptr(info.ptr);
         }
     }
 
@@ -185,9 +185,9 @@ impl Collector {
     }
 
     fn mark_ptr(&self, ptr: *const UntypedGcBox, root: bool) {
-        if !self.allocator.is_ptr_in_range(ptr) {
-            return;
-        }
+        // if !self.allocator.is_ptr_in_range(ptr) {
+        //     return;
+        // }
 
         let mut children = None;
         if let Some(info) = self.allocator.info_for_ptr(ptr) {
@@ -203,41 +203,41 @@ impl Collector {
 
         if let Some(children) = children {
             for val in children {
-                self.mark_ptr(val, false);
+                self.mark_ptr(val.as_ptr(), false);
             }
         }
     }
 
     // ptr MUST be a valid tracked object
-    fn mark_island_ptr(&self, ptr: *const UntypedGcBox) {
-        assert!(self.allocator.is_ptr_in_range(ptr));
+    fn mark_island_ptr(&self, ptr: NonNull<UntypedGcBox>) {
+        // assert!(self.allocator.is_ptr_in_range(ptr));
 
         let mut children = None;
-        if let Some(info) = self.allocator.info_for_ptr(ptr) {
+        if let Some(info) = self.allocator.info_for_ptr(ptr.as_ptr()) {
             children = Some(info.children());
         }
 
         if let Some(children) = children {
             for val in children {
-                if let Some(child) = self.allocator.info_for_ptr(val) {
+                if let Some(child) = self.allocator.info_for_ptr(val.as_ptr()) {
                     child.mark_isolated();
                 }
             }
         }
     }
 
-    fn mark_newly_found_ptr(&self, ptr: *const UntypedGcBox) {
-        assert!(self.allocator.is_ptr_in_range(ptr));
+    fn mark_newly_found_ptr(&self, ptr: NonNull<UntypedGcBox>) {
+        // assert!(self.allocator.is_ptr_in_range(ptr));
 
         let mut children = None;
-        if let Some(info) = self.allocator.info_for_ptr(ptr) {
+        if let Some(info) = self.allocator.info_for_ptr(ptr.as_ptr()) {
             children = Some(info.children());
         }
 
         if let Some(children) = children {
             for val in children {
                 let mut is_valid = false;
-                if let Some(child) = self.allocator.info_for_ptr(val) {
+                if let Some(child) = self.allocator.info_for_ptr(val.as_ptr()) {
                     child.unmark_isolated();
                     child.mark_branch();
                     is_valid = true;

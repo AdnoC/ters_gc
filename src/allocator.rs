@@ -84,7 +84,7 @@ impl AllocInfo {
         (self.refs)(self.ptr)
     }
 
-    pub(crate) fn children(&self) -> impl Iterator<Item = *const UntypedGcBox> {
+    pub(crate) fn children(&self) -> impl Iterator<Item = NonNull<UntypedGcBox>> {
         let tracer = (self.trace)(self.ptr);
         tracer.results().map(|dest| dest.0)
     }
@@ -133,11 +133,11 @@ impl Allocator {
         boxed.reclaim_value()
     }
 
-    pub fn is_ptr_in_range(&self, _ptr: *const UntypedGcBox) -> bool {
-        true
-        // let ptr_val = ptr as usize;
-        // self.min_ptr >= ptr_val && self.max_ptr <= ptr_val
-    }
+    // pub fn is_ptr_in_range(&self, _ptr: *const UntypedGcBox) -> bool {
+    //     true
+    //     // let ptr_val = ptr as usize;
+    //     // self.min_ptr >= ptr_val && self.max_ptr <= ptr_val
+    // }
 
     // pub fn is_ptr_tracked<T>(&self, ptr: *const T) -> bool {
     //     let ptr: *const UntypedGcBox = ptr as *const _;
