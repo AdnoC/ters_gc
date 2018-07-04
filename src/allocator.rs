@@ -20,7 +20,6 @@ pub(crate) struct AllocInfo {
 
 impl AllocInfo {
     fn new<T: TraceTo>(value: T) -> AllocInfo {
-        use std::mem::size_of;
         AllocInfo {
             ptr: store_single_value(value).as_untyped(),
             rebox: get_rebox::<T>(),
