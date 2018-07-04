@@ -4,14 +4,19 @@ use std::ptr::NonNull;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
+use std::marker;
+use AsTyped;
+use UntypedGcBox;
 
+/// TODO: Implement traits:
+/// std::fmt::Pointer
 
 /// TODO: Send & Sync safety
 
 
-pub(crate) struct GcBox<T: ?Sized> {
+pub(crate) struct GcBox<T> {
     refs: Cell<usize>,
-    coroner: Coroner<T>,
+    coroner: Coroner,
     val: T, // TODO: Why does this fail if it is first in list?
 }
 
@@ -27,7 +32,7 @@ impl<T> GcBox<T> {
         self.val
     }
 }
-impl<T: ?Sized> GcBox<T> {
+impl<T> GcBox<T> {
     pub fn incr_ref(&self) {
         self.refs.set(self.refs.get() + 1);
     }
@@ -47,23 +52,23 @@ impl<T: ?Sized> GcBox<T> {
             self.coroner.track(self_ptr);
         }
         let tracker = self.coroner.tracker();
-        TrackingRef(tracker)
+        TrackingRef(tracker, PhantomData)
     }
 }
 
-struct Coroner<T: ?Sized>(RefCell<Option<LifeTracker<T>>>);
-impl<T: ?Sized> Drop for Coroner<T> {
+struct Coroner(RefCell<Option<LifeTracker>>);
+impl Drop for Coroner {
     fn drop(&mut self) {
         if let Some(ref tracker) = *self.0.borrow() {
             tracker.dead();
         }
     }
 }
-impl<T: ?Sized> Coroner<T> {
-    fn new() -> Coroner<T> {
+impl Coroner {
+    fn new() -> Coroner {
         Coroner(RefCell::new(None))
     }
-    fn track(&self, target: *const GcBox<T>) {
+    fn track<T>(&self, target: *const GcBox<T>) { // FIXME NonNull
         *self.0.borrow_mut() = Some(LifeTracker::new(target));
     }
 
@@ -71,17 +76,17 @@ impl<T: ?Sized> Coroner<T> {
         self.0.borrow().is_some()
     }
 
-    fn tracker(&self) -> LifeTracker<T> {
+    fn tracker(&self) -> LifeTracker {
         self.0.borrow().as_ref().expect("was not tracking").clone()
     }
 }
 
-struct LifeTracker<T: ?Sized>(Rc<TrackingInfo<T>>);
-impl<T: ?Sized> LifeTracker<T> {
-    fn new(target: *const GcBox<T>) -> LifeTracker<T> {
+struct LifeTracker(Rc<TrackingInfo>);
+impl LifeTracker {
+    fn new<T>(target: *const GcBox<T>) -> LifeTracker { // FIXME NonNull
         LifeTracker(Rc::new(TrackingInfo {
             alive: Cell::new(true),
-            target,
+            target: target as *const _,
         }))
     }
     fn is_alive(&self) -> bool {
@@ -92,26 +97,29 @@ impl<T: ?Sized> LifeTracker<T> {
         self.0.alive.set(false);
     }
 }
-impl<T: ?Sized> Clone for LifeTracker<T> {
+impl Clone for LifeTracker {
     fn clone(&self) -> Self {
         LifeTracker(self.0.clone())
     }
 }
 #[derive(Clone)]
-struct TrackingInfo<T: ?Sized> {
+struct TrackingInfo {
     alive: Cell<bool>,
-    target: *const GcBox<T>,
+    // Type erased so that variance works?
+    target: *const UntypedGcBox, // FIXME NonNull
 }
 
 #[derive(Clone)]
-struct TrackingRef<T: ?Sized>(LifeTracker<T>);
-impl<T: ?Sized> TrackingRef<T> {
+struct TrackingRef<T>(LifeTracker, PhantomData<T>);
+impl<T> TrackingRef<T> {
     fn is_alive(&self) -> bool {
         self.0.is_alive()
     }
-    fn get(&self) -> Option<*const GcBox<T>> {
+    fn get(&self) -> Option<*const GcBox<T>> { // FIXME NonNull
         if self.is_alive() {
-            Some((self.0).0.target)
+            let target_untyped: *const UntypedGcBox = (self.0).0.target;
+            // let target_typed: *const GcBox<T> = target_untyped as *const _;
+            Some(unsafe { ::std::mem::transmute(target_untyped) }) // FIXME NonNull
         } else {
             None
         }
@@ -119,12 +127,13 @@ impl<T: ?Sized> TrackingRef<T> {
 }
 
 #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
-pub struct Gc<'arena, T: ?Sized + 'arena> {
+pub struct Gc<'arena, T: 'arena> {
     _marker: PhantomData<&'arena T>,
     ptr: NonNull<GcBox<T>>, // TODO Make NonNull<GcBox<T>>
 }
 
-impl<'a, T: ?Sized + 'a> Gc<'a, T> {
+
+impl<'a, T: 'a> Gc<'a, T> {
     pub(crate) fn from_raw_nonnull(
         ptr: NonNull<GcBox<T>>,
         _marker: PhantomData<&'a T>,
@@ -172,19 +181,19 @@ impl<'a, T: ?Sized + 'a> Gc<'a, T> {
         Safe::to_unsafe(this)
     }
 }
-impl<'a, T: ?Sized + 'a> Deref for Gc<'a, T> {
+impl<'a, T: 'a> Deref for Gc<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
         Gc::get_gc_box(self).borrow()
     }
 }
-impl<'a, T: ?Sized + 'a> Drop for Gc<'a, T> {
+impl<'a, T: 'a> Drop for Gc<'a, T> {
     fn drop(&mut self) {
         Gc::get_gc_box(self).decr_ref();
     }
 }
-impl<'a, T: ?Sized + 'a> Clone for Gc<'a, T> {
+impl<'a, T: 'a> Clone for Gc<'a, T> {
     fn clone(&self) -> Self {
         let gc = Gc {
             _marker: PhantomData,
@@ -195,13 +204,19 @@ impl<'a, T: ?Sized + 'a> Clone for Gc<'a, T> {
     }
 }
 
+impl<'a, T: 'a> AsRef<T> for Gc<'a, T> {
+    fn as_ref(&self) -> &T {
+        &**self
+    }
+}
+
 #[derive(Clone)]
-pub struct Weak<'arena, T: ?Sized + 'arena> {
+pub struct Weak<'arena, T: 'arena> {
     _marker: PhantomData<*const &'arena ()>,
     weak_ptr: TrackingRef<T>,
 }
 
-impl<'a, T: ?Sized + 'a> Weak<'a, T> {
+impl<'a, T: 'a> Weak<'a, T> {
     pub fn upgrade(&self) -> Option<Gc<'a, T>> {
         self.weak_ptr
             .get()
@@ -219,11 +234,11 @@ impl<'a, T: ?Sized + 'a> Weak<'a, T> {
 }
 
 #[derive(Clone)]
-pub struct Safe<'arena, T: ?Sized + 'arena> {
+pub struct Safe<'arena, T: 'arena> {
     _gc_marker: Option<Gc<'arena, T>>,
     ptr: Weak<'arena, T>,
 }
-impl<'a, T: ?Sized + 'a> Safe<'a, T> {
+impl<'a, T: 'a> Safe<'a, T> {
     pub fn to_unsafe(mut this: Safe<'a, T>) -> Gc<'a, T> {
         use std::mem::replace;
         let gc = replace(&mut this._gc_marker, None);
@@ -243,7 +258,7 @@ impl<'a, T: ?Sized + 'a> Safe<'a, T> {
         }
     }
 }
-impl<'a, T: ?Sized + 'a> Drop for Safe<'a, T> {
+impl<'a, T: 'a> Drop for Safe<'a, T> {
     fn drop(&mut self) {
         use std::mem::{forget, replace};
         println!("self living = {}", self.is_alive());
@@ -353,5 +368,23 @@ mod tests {
     #[test]
     fn store_unsized_types() {
         // TODO
+    }
+    #[test]
+    fn variance_works() {
+        // Check compile-test for cases that are illegal
+        fn variant_with_gc() {
+            fn expect<'a>(_: &'a i32, _: Gc<&'a i32>) { unimplemented!() }
+            fn provide(m: Gc<&'static i32>) { let val = 13; expect(&val, m); }
+        }
+
+        fn variant_with_weak() {
+            fn expect<'a>(_: &'a i32, _: Weak<&'a i32>) { unimplemented!() }
+            fn provide(m: Weak<&'static i32>) { let val = 13; expect(&val, m); }
+        }
+
+        fn variant_with_safe() {
+            fn expect<'a>(_: &'a i32, _: Safe<&'a i32>) { unimplemented!() }
+            fn provide(m: Safe<&'static i32>) { let val = 13; expect(&val, m); }
+        }
     }
 }
