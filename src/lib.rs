@@ -113,37 +113,27 @@ impl Collector {
         collector.mark_impl(stack_top);
     }
 
-    fn mark_impl(&mut self, stack_top: *const ()) {
+    fn mark_impl(&self, stack_top: *const ()) {
         self.mark_stack(stack_top);
         self.mark_in_gc();
     }
 
-    fn mark_in_gc(&mut self) {
-        let mut unreachable_objects = vec![];
-        for info in self.allocator.items.values() {
-            if !info.is_marked_reachable() {
-                unreachable_objects.push(info.ptr);
-            }
-        }
-        for &ptr in &unreachable_objects {
-            self.mark_island_ptr(ptr);
+    fn mark_in_gc(&self) {
+        let unreachable_objects = self.allocator.items.values()
+            .filter(|info| !info.is_marked_reachable());
+        for info in unreachable_objects.clone() {
+            self.mark_island_ptr(info.ptr);
         }
 
-        let mut heap_objects = vec![];
-        for ptr in unreachable_objects {
-            let info = self.allocator.info_for_ptr_mut(ptr);
-            let info = info.expect("no info :(");
-            if Self::is_object_reachable(info) {
-                heap_objects.push(ptr);
-            }
-        }
-        for ptr in heap_objects {
-            self.mark_newly_found_ptr(ptr);
+        let heap_objects = unreachable_objects
+            .filter(|info| Self::is_object_reachable(info));
+        for info in heap_objects {
+            self.mark_newly_found_ptr(info.ptr);
         }
     }
 
     #[inline(never)]
-    fn mark_stack(&mut self, stack_top: *const ()) {
+    fn mark_stack(&self, stack_top: *const ()) {
         use std::mem::size_of;
 
         let top = stack_top as usize;
@@ -165,14 +155,14 @@ impl Collector {
         }
     }
 
-    fn mark_ptr(&mut self, ptr: *const UntypedGcBox, root: bool) {
+    fn mark_ptr(&self, ptr: *const UntypedGcBox, root: bool) {
         println!("Marking ptr {}", ptr as usize);
         if !self.allocator.is_ptr_in_range(ptr) {
             return;
         }
 
         let mut children = None;
-        if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
+        if let Some(info) = self.allocator.info_for_ptr(ptr) {
             if !info.is_marked_reachable() {
                 children = Some(info.children());
             }
@@ -191,35 +181,35 @@ impl Collector {
     }
 
     // ptr MUST be a valid tracked object
-    fn mark_island_ptr(&mut self, ptr: *const UntypedGcBox) {
+    fn mark_island_ptr(&self, ptr: *const UntypedGcBox) {
         assert!(self.allocator.is_ptr_in_range(ptr));
 
         let mut children = None;
-        if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
+        if let Some(info) = self.allocator.info_for_ptr(ptr) {
             children = Some(info.children());
         }
 
         if let Some(children) = children {
             for val in children {
-                if let Some(child) = self.allocator.info_for_ptr_mut(val) {
+                if let Some(child) = self.allocator.info_for_ptr(val) {
                     child.mark_isolated();
                 }
             }
         }
     }
 
-    fn mark_newly_found_ptr(&mut self, ptr: *const UntypedGcBox) {
+    fn mark_newly_found_ptr(&self, ptr: *const UntypedGcBox) {
         assert!(self.allocator.is_ptr_in_range(ptr));
 
         let mut children = None;
-        if let Some(info) = self.allocator.info_for_ptr_mut(ptr) {
+        if let Some(info) = self.allocator.info_for_ptr(ptr) {
             children = Some(info.children());
         }
 
         if let Some(children) = children {
             for val in children {
                 let mut is_valid = false;
-                if let Some(child) = self.allocator.info_for_ptr_mut(val) {
+                if let Some(child) = self.allocator.info_for_ptr(val) {
                     child.unmark_isolated();
                     child.mark_branch();
                     is_valid = true;
