@@ -498,7 +498,6 @@ mod tests {
 
     #[test]
     fn pointed_to_by_heap_root_arent_freed() {
-        use std::cell::Cell;
         struct List<'a> {
             ptr: Option<Gc<'a, List<'a>>>,
         }

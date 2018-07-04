@@ -16,7 +16,6 @@ pub(crate) struct AllocInfo {
     isolated: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
     refs: fn(*const UntypedGcBox) -> usize,
     trace: fn(*const UntypedGcBox) -> Tracer,
-    size: usize,
 }
 
 impl AllocInfo {
@@ -30,7 +29,6 @@ impl AllocInfo {
             isolated: Cell::new(0),
             refs: get_refs_accessor::<T>(),
             trace: get_tracer::<T>(),
-            size: size_of::<T>(),
         }
     }
 
@@ -136,9 +134,6 @@ impl Allocator {
     pub(crate) fn info_for_ptr(&self, ptr: *const UntypedGcBox) -> Option<&AllocInfo> {
         self.items.get(&ptr)
     }
-    pub(crate) fn info_for_ptr_mut(&mut self, ptr: *const UntypedGcBox) -> Option<&mut AllocInfo> {
-        self.items.get_mut(&ptr)
-    }
 
     pub fn should_shrink_items(&self) -> bool {
         false
@@ -174,11 +169,6 @@ fn get_tracer<T: TraceTo>() -> fn(*const UntypedGcBox) -> Tracer {
         gc_box.borrow().trace_to(&mut tracer);
         tracer
     }
-}
-
-#[inline]
-fn round_up(base: usize, align: usize) -> usize {
-    base.checked_add(align - 1).unwrap() & !(align - 1)
 }
 
 #[cfg(test)]
