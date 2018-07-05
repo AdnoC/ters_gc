@@ -23,7 +23,7 @@
 //! A short usage example:
 //!
 //! ```
-//! use ters_gc::{Collector, Proxy, Gc, trace};
+//! use ters_gc::{Collector, Gc, trace};
 //! use std::cell::RefCell;
 //!
 //!
@@ -38,24 +38,19 @@
 //!     }
 //! }
 //!
-//! // Do some computations that are best expressed with a cyclic data structure
-//! fn compute_cyclic_data(proxy: &mut Proxy) {
-//!     let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
-//!     let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
-//!     *thing1.0.borrow_mut() = Some(thing2.clone());
-//! }
 //!
 //! // Make a new collector to keep the gc state
 //! let mut col = Collector::new();
 //!
-//! // Because of how unsafe scoping works, you shouldn't make a lambda
-//! // within the arguments of `run_with_gc`, otherwise you might stray
-//! // outside of safe rust.
-//! fn find_meaning_of_life(mut proxy: Proxy) -> i32 {
+//! // Find out the meaning of life, and allow use of the gc while doing so
+//! let meaning = col.run_with_gc(|mut proxy| {
 //!
-//!     // Do some calculations. Do it later in the stack so that the pointers
-//!     // to gc objects aren't in the used portion of the stack when collecting.
-//!     compute_cyclic_data(&mut proxy); // FIXME: inline the function
+//!     // Do some computations that are best expressed with a cyclic data structure
+//!     {
+//!         let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
+//!         let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+//!         *thing1.0.borrow_mut() = Some(thing2.clone());
+//!     }
 //!
 //!     // Collect garbage
 //!     proxy.run();
@@ -65,10 +60,7 @@
 //!
 //!     // Return
 //!     42
-//! }
-//!
-//! // Find out the meaning of life, and allow use of the gc while doing so
-//! let meaning = unsafe { col.run_with_gc(find_meaning_of_life) };
+//! });
 //!
 //! assert_eq!(meaning, 42);
 //! ```
@@ -191,7 +183,7 @@ impl Collector {
 
     /// Unsafe because there is an unsafe hole in garbage collection that cannot
     /// be fixed. Namely, you cannot store pointers to tracked objects on the heap.
-    pub unsafe fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
+    pub fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
         let proxy = self.proxy();
         func(proxy)
     }
@@ -558,24 +550,19 @@ mod tests {
             }
         }
 
-        // Do some computations that are best expressed with a cyclic data structure
-        fn compute_cyclic_data(proxy: &mut Proxy) {
-            let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
-            let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
-            *thing1.0.borrow_mut() = Some(thing2.clone());
-        }
 
         // Make a new collector to keep the gc state
         let mut col = Collector::new();
 
-        // Because of how unsafe scoping works, you shouldn't make a lambda
-        // within the arguments of `run_with_gc`, otherwise you might stray
-        // outside of safe rust.
-        fn find_meaning_of_life(mut proxy: Proxy) -> i32 {
+        // Find out the meaning of life, and allow use of the gc while doing so
+        let meaning = col.run_with_gc(|mut proxy| {
 
-            // Do some calculations. Do it later in the stack so that the pointers
-            // to gc objects aren't in the used portion of the stack when collecting.
-            compute_cyclic_data(&mut proxy); // FIXME: inline the function
+            // Do some computations that are best expressed with a cyclic data structure
+            {
+                let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
+                let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+                *thing1.0.borrow_mut() = Some(thing2.clone());
+            }
 
             // Collect garbage
             proxy.run();
@@ -585,10 +572,7 @@ mod tests {
 
             // Return
             42
-        }
-
-        // Find out the meaning of life, and allow use of the gc while doing so
-        let meaning = unsafe { col.run_with_gc(find_meaning_of_life) };
+        });
 
         assert_eq!(meaning, 42);
     }
