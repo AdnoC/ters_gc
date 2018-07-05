@@ -628,4 +628,150 @@ mod tests {
             fn provide(m: Safe<&'static i32>) { let val = 13; expect(&val, m); }
         }
     }
+
+    #[test]
+    fn std_impls_gc() {
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            use std::cmp::Ordering;
+            use std::hash::{Hash, Hasher};
+            use std::borrow::Borrow;
+            fn calculate_hash<H: Hash>(h: &H) -> u64 {
+                use std::collections::hash_map::DefaultHasher;
+                let mut s = DefaultHasher::new();
+                h.hash(&mut s);
+                s.finish()
+            }
+            fn requires_eq<E: Eq>(_e: &E) {}
+            let one = proxy.store(1);
+            let other_one = proxy.store(1);
+            let two = proxy.store(2);
+            let other_two = proxy.store(2);
+            // Clone
+            assert_eq!(1, *one.clone());
+            // AsRef
+            assert_eq!(1, *one.as_ref());
+            // Debug
+            assert_eq!(format!("{:?}", 1), format!("{:?}", one));
+            // Display
+            assert_eq!(format!("{}", 1), format!("{}", one));
+            // Pointer
+            assert_eq!(format!("{:p}", one), format!("{:p}", one.clone()));
+            // Hash
+            assert_eq!(calculate_hash(&1), calculate_hash(&one));
+            // Borrow
+            assert_eq!(1, *one.borrow());
+            // PartialEq
+            assert_eq!(one, other_one);
+            assert!(one != two);
+            // Eq
+            requires_eq(&one);
+            // PartialOrd
+            assert_eq!(Some(Ordering::Less), one.partial_cmp(&two));
+            assert_eq!(Some(Ordering::Equal), one.partial_cmp(&other_one));
+            assert_eq!(Some(Ordering::Greater), two.partial_cmp(&one));
+            assert!(one < two);
+            assert!(one <= two);
+            assert!(one <= other_one);
+            assert!(two > one);
+            assert!(two >= one);
+            assert!(two >= other_two);
+            // Ord
+            assert_eq!(Ordering::Less, one.cmp(&two));
+            assert_eq!(Ordering::Equal, one.cmp(&other_one));
+            assert_eq!(Ordering::Greater, two.cmp(&one));
+        };
+
+        unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn std_impls_weak() {
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            use std::cmp::Ordering;
+            fn requires_eq<E: Eq>(_e: &E) {}
+            let one = proxy.store(1);
+            let other_one = proxy.store(1);
+            let two = proxy.store(2);
+            let other_two = proxy.store(2);
+
+            let one = Gc::downgrade(&one);
+            let other_one = Gc::downgrade(&other_one);
+            let two = Gc::downgrade(&two);
+            let other_two = Gc::downgrade(&other_two);
+            // Clone
+            assert_eq!(1, *one.clone().get().unwrap());
+            // Debug
+            let one_debug = format!("{:?}", one);
+            assert!(one_debug.contains("Weak"));
+            assert!(one_debug.contains(&format!("{:?}", 1)));
+            // PartialEq
+            assert_eq!(one, other_one);
+            assert!(one != two);
+            // Eq
+            requires_eq(&one);
+            // PartialOrd
+            assert_eq!(Some(Ordering::Less), one.partial_cmp(&two));
+            assert_eq!(Some(Ordering::Equal), one.partial_cmp(&other_one));
+            assert_eq!(Some(Ordering::Greater), two.partial_cmp(&one));
+            assert!(one < two);
+            assert!(one <= two);
+            assert!(one <= other_one);
+            assert!(two > one);
+            assert!(two >= one);
+            assert!(two >= other_two);
+            // Ord
+            assert_eq!(Ordering::Less, one.cmp(&two));
+            assert_eq!(Ordering::Equal, one.cmp(&other_one));
+            assert_eq!(Ordering::Greater, two.cmp(&one));
+        };
+
+        unsafe { col.run_with_gc(body) };
+    }
+
+    #[test]
+    fn std_impls_safe() {
+        let mut col = Collector::new();
+        let body = |mut proxy: Proxy| {
+            use std::cmp::Ordering;
+            fn requires_eq<E: Eq>(_e: &E) {}
+            let one = proxy.store(1);
+            let other_one = proxy.store(1);
+            let two = proxy.store(2);
+            let other_two = proxy.store(2);
+
+            let one = Gc::to_safe(one);
+            let other_one = Gc::to_safe(other_one);
+            let two = Gc::to_safe(two);
+            let other_two = Gc::to_safe(other_two);
+            // Clone
+            assert_eq!(1, *one.clone().get().unwrap());
+            // Debug
+            let one_debug = format!("{:?}", one);
+            assert!(one_debug.contains("Safe"));
+            assert!(one_debug.contains(&format!("{:?}", 1)));
+            // PartialEq
+            assert_eq!(one, other_one);
+            assert!(one != two);
+            // Eq
+            requires_eq(&one);
+            // PartialOrd
+            assert_eq!(Some(Ordering::Less), one.partial_cmp(&two));
+            assert_eq!(Some(Ordering::Equal), one.partial_cmp(&other_one));
+            assert_eq!(Some(Ordering::Greater), two.partial_cmp(&one));
+            assert!(one < two);
+            assert!(one <= two);
+            assert!(one <= other_one);
+            assert!(two > one);
+            assert!(two >= one);
+            assert!(two >= other_two);
+            // Ord
+            assert_eq!(Ordering::Less, one.cmp(&two));
+            assert_eq!(Ordering::Equal, one.cmp(&other_one));
+            assert_eq!(Ordering::Greater, two.cmp(&one));
+        };
+
+        unsafe { col.run_with_gc(body) };
+    }
 }
