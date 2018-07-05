@@ -308,7 +308,7 @@ impl<'a, T: 'a> Weak<'a, T> {
     pub fn is_alive(&self) -> bool {
         self.weak_ptr.is_alive()
     }
-    pub fn get(&self) -> Option<&T> {
+    pub fn get(&self) -> Option<&T> { // FIXME MEMORY SAFETY HOLE: `T` should only be accessable after conversion to `Gc` via `upgrade`
         self.weak_ptr
             .get()
             .map(|gc_box| unsafe { (*gc_box).borrow() })
