@@ -15,50 +15,51 @@ use terse::*;
 
 // NOTE: Might have problems with SmallVec not clearing values of `remove`d entries
 
-type GcNode<'a> = PrintWrapper<Gc<'a, Node<'a>>>;
-type GcEdge<'a> = PrintWrapper<Gc<'a, Edge<'a>>>;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct PrintWrapper<P>
-where
-    P: Deref,
-    <P as Deref>::Target: fmt::Debug,
-{
-    ptr: P,
-}
-
-impl<P> fmt::Debug for PrintWrapper<P>
-where
-    P: Deref,
-    <P as Deref>::Target: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("PrintWrapp")
-            .field("ptr", &&*self.ptr)
-            .finish()
-    }
-}
-
-impl<P> Deref for PrintWrapper<P>
-where
-    P: Deref,
-    <P as Deref>::Target: fmt::Debug,
-{
-    type Target = <P as Deref>::Target;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.ptr
-    }
-}
-impl<P> TraceTo for PrintWrapper<P>
-where
-    P: Deref + TraceTo,
-    <P as Deref>::Target: fmt::Debug,
-{
-    fn trace_to(&self, tracer: &mut Tracer) {
-        self.ptr.trace_to(tracer);
-    }
-}
+type GcNode<'a> = Gc<'a, Node<'a>>;
+type GcEdge<'a> = Gc<'a, Edge<'a>>;
+//
+// #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+// struct PrintWrapper<P>
+// where
+//     P: Deref,
+//     <P as Deref>::Target: fmt::Debug,
+// {
+//     ptr: P,
+// }
+//
+// impl<P> fmt::Debug for PrintWrapper<P>
+// where
+//     P: Deref,
+//     <P as Deref>::Target: fmt::Debug,
+// {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         println!("pw println");
+//         f.debug_struct("PrintWrapp")
+//             .field("ptr", &&*self.ptr)
+//             .finish()
+//     }
+// }
+//
+// impl<P> Deref for PrintWrapper<P>
+// where
+//     P: Deref,
+//     <P as Deref>::Target: fmt::Debug,
+// {
+//     type Target = <P as Deref>::Target;
+//
+//     fn deref(&self) -> &Self::Target {
+//         &*self.ptr
+//     }
+// }
+// impl<P> TraceTo for PrintWrapper<P>
+// where
+//     P: Deref + TraceTo,
+//     <P as Deref>::Target: fmt::Debug,
+// {
+//     fn trace_to(&self, tracer: &mut Tracer) {
+//         self.ptr.trace_to(tracer);
+//     }
+// }
 
 // impl<P> PartialEq for PrintWrapper<P>
 // where P: Deref + PartialEq, <P as Deref>::Target: fmt::Debug {
@@ -85,9 +86,7 @@ impl<'a> Graph<'a> {
             adjacencies: RefCell::new(SmallVec::new()),
             name,
         };
-        let node = PrintWrapper {
-            ptr: proxy.store(node),
-        };
+        let node = proxy.store(node);
         self.nodes.push(node.clone());
         node
     }
@@ -188,9 +187,7 @@ struct Node<'a> {
 impl<'a> Node<'a> {
     fn connect_to(&self, proxy: &mut Proxy<'a>, dest: GcNode<'a>, weight: u32) {
         assert!(self.adjacencies.borrow().len() < self.adjacencies.borrow().inline_size() - 1);
-        let edge = PrintWrapper {
-            ptr: proxy.store(Edge { dest, weight }),
-        };
+        let edge = proxy.store(Edge { dest, weight });
         self.adjacencies.borrow_mut().push(edge);
     }
 
