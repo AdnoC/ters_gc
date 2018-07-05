@@ -8,12 +8,12 @@ use std::marker;
 use UntypedGcBox;
 
 /// TODO: Implement traits:
-/// Clone | w s
-/// PartialEq | w s
-/// Eq | w s
-/// PartialOrd | w s
-/// Ord | w s
-/// Debug g w s
+/// Clone | s
+/// Debug | s
+/// PartialEq | s
+/// Eq | s
+/// PartialOrd | s
+/// Ord | s
 
 /// TODO: Send & Sync safety
 
@@ -113,7 +113,6 @@ struct TrackingInfo {
     target: *const UntypedGcBox, // FIXME NonNull
 }
 
-#[derive(Clone)]
 struct TrackingRef<T>(LifeTracker, PhantomData<T>);
 impl<T> TrackingRef<T> {
     fn is_alive(&self) -> bool {
@@ -127,6 +126,13 @@ impl<T> TrackingRef<T> {
         } else {
             None
         }
+    }
+}
+// Not sure why derive(Clone) didn't work
+// Maybe a PhantomData thing?
+impl<T> Clone for TrackingRef<T> {
+    fn clone(&self) -> Self {
+        TrackingRef(self.0.clone(), self.1.clone())
     }
 }
 
@@ -200,7 +206,7 @@ impl<'a, T: 'a> Drop for Gc<'a, T> {
 /// Impls that aren't part of the core functionality of the struct, but
 /// are implemented since it is a smart pointer
 mod gc_impls {
-    use super::{Gc, Safe, Weak};
+    use super::Gc;
     use std::hash::{Hasher, Hash};
     use std::cmp::Ordering;
     use std::fmt;
@@ -209,9 +215,8 @@ mod gc_impls {
 
     impl<'a, T: 'a> Clone for Gc<'a, T> {
         fn clone(&self) -> Self {
-            use std::marker::PhantomData;
             let gc = Gc {
-                _marker: PhantomData,
+                _marker: self._marker.clone(),
                 ptr: self.ptr,
             };
             Gc::get_gc_box(&gc).incr_ref();
@@ -251,11 +256,11 @@ mod gc_impls {
     impl<'a, T: 'a + PartialEq> PartialEq for Gc<'a, T> {
         #[inline(always)]
         fn eq(&self, other: &Gc<'a, T>) -> bool {
-            (**self).eq(&**other)
+            **self == **other
         }
         #[inline(always)]
         fn ne(&self, other: &Gc<'a, T>) -> bool {
-            (**self).ne(&**other)
+            **self != **other
         }
     }
     impl<'a, T: 'a + Eq> Eq for Gc<'a, T> {}
@@ -289,9 +294,8 @@ mod gc_impls {
     }
 }
 
-#[derive(Clone)]
 pub struct Weak<'arena, T: 'arena> {
-    _marker: PhantomData<*const &'arena ()>,
+    _marker: PhantomData<*const &'arena ()>, // TODO: Is this the right PhantomData type?
     weak_ptr: TrackingRef<T>,
 }
 
@@ -309,6 +313,86 @@ impl<'a, T: 'a> Weak<'a, T> {
         self.weak_ptr
             .get()
             .map(|gc_box| unsafe { (*gc_box).borrow() })
+    }
+    fn get_borrow(&self) -> &T {
+        self.get().expect("weak pointer was already dead")
+    }
+}
+
+mod weak_impls {
+    use super::Weak;
+    use std::cmp::Ordering;
+    use std::fmt;
+    impl<'a, T: 'a> Clone for Weak<'a, T> {
+        fn clone(&self) -> Self {
+            Weak {
+                _marker: self._marker.clone(),
+                weak_ptr: self.weak_ptr.clone(),
+            }
+        }
+    }
+    impl<'a, T: 'a + fmt::Debug> fmt::Debug for Weak<'a, T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self.get() {
+                Some(value) => {
+                    f.debug_struct("Weak")
+                        .field("value", value)
+                        .finish()
+                },
+                None => {
+                    struct DeadPlaceholder;
+
+                    impl fmt::Debug for DeadPlaceholder {
+                        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                            f.write_str("<dead>")
+                        }
+                    }
+
+                    f.debug_struct("Weak")
+                        .field("value", &DeadPlaceholder)
+                        .finish()
+                }
+            }
+        }
+    }
+    impl<'a, T: 'a + PartialEq> PartialEq for Weak<'a, T> {
+        #[inline(always)]
+        fn eq(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() == *other.get_borrow()
+        }
+        #[inline(always)]
+        fn ne(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() != *other.get_borrow()
+        }
+    }
+    impl<'a, T: 'a + Eq> Eq for Weak<'a, T> {}
+    impl<'a, T: 'a + PartialOrd> PartialOrd for Weak<'a, T> {
+        #[inline(always)]
+        fn partial_cmp(&self, other: &Weak<'a, T>) -> Option<Ordering> {
+            (*self.get_borrow()).partial_cmp(other.get_borrow())
+        }
+        #[inline(always)]
+        fn lt(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() < *other.get_borrow()
+        }
+        #[inline(always)]
+        fn le(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() <= *other.get_borrow()
+        }
+        #[inline(always)]
+        fn gt(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() > *other.get_borrow()
+        }
+        #[inline(always)]
+        fn ge(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() >= *other.get_borrow()
+        }
+    }
+    impl<'a, T: 'a + Ord> Ord for Weak<'a, T> {
+        #[inline]
+        fn cmp(&self, other: &Weak<'a, T>) -> Ordering {
+            (*self.get_borrow()).cmp(other.get_borrow())
+        }
     }
 }
 
