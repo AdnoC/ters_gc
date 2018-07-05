@@ -4,6 +4,7 @@
 //!
 //! FIXME MEMORY SAFETY HOLE: Weak::get. `T` should only be accessible after conversion to `Gc` via `upgrade`
 //!
+//! *TODO: Remove all stack-related mechanisms*
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
 //! *TODO: Ensure Proxy is !Send*
 //!
@@ -249,73 +250,16 @@ impl Collector {
         collector.mark_impl(stack_top);
     }
 
-    fn mark_impl(&self, stack_top: StackPtr) {
-        self.mark_stack(stack_top);
-        self.mark_in_gc();
-    }
-
-    fn mark_in_gc(&self) {
-        let unreachable_objects = self
-            .allocator
-            .items
-            .values()
-            .filter(|info| !info.is_marked_reachable());
-        for info in unreachable_objects.clone() {
+    fn mark_impl(&self, _stack_top: StackPtr) {
+        for info in self.allocator.items.values() {
             self.mark_island_ptr(info.ptr);
         }
 
-        let heap_objects = unreachable_objects.filter(|info| Self::is_object_reachable(info));
-        for info in heap_objects {
+        let roots = self.allocator.items.values()
+            .filter(|info| Self::is_object_reachable(info));
+
+        for info in roots {
             self.mark_newly_found_ptr(info.ptr);
-        }
-    }
-
-    #[inline(never)]
-    fn mark_stack(&self, stack_top: StackPtr) {
-        use std::mem::size_of;
-
-        // Since top and bottom are ptrs to a `usize`, they are
-        // garunteed to have the correct alignment.
-        let top = stack_top.0 as usize;
-        let bottom = self.stack_bottom.0 as usize;
-        let (top, bottom) = if top < bottom {
-            (bottom, top)
-        } else {
-            (top, bottom)
-        };
-
-        if top == bottom {
-            return;
-        }
-
-        for addr in (bottom..top).step_by(size_of::<usize>()) {
-            let stack_ptr = addr as *const *const UntypedGcBox;
-            let stack_value = unsafe { *stack_ptr };
-            self.mark_ptr(stack_value, true);
-        }
-    }
-
-    fn mark_ptr(&self, ptr: *const UntypedGcBox, root: bool) {
-        // if !self.allocator.is_ptr_in_range(ptr) {
-        //     return;
-        // }
-
-        let mut children = None;
-        if let Some(info) = self.allocator.info_for_ptr(ptr) {
-            if !info.is_marked_reachable() {
-                children = Some(info.children());
-            }
-            if root {
-                info.mark_root();
-            } else {
-                info.mark_branch();
-            }
-        }
-
-        if let Some(children) = children {
-            for val in children {
-                self.mark_ptr(val.as_ptr(), false);
-            }
         }
     }
 
@@ -347,24 +291,19 @@ impl Collector {
 
         if let Some(children) = children {
             for val in children {
-                let mut is_valid = false;
                 if let Some(child) = self.allocator.info_for_ptr(val.as_ptr()) {
-                    child.unmark_isolated();
-                    child.mark_branch();
-                    is_valid = true;
-                }
-                if is_valid {
-                    self.mark_newly_found_ptr(val);
+                    if !child.is_marked_reachable() {
+                        child.unmark_isolated();
+                        child.mark_reachable();
+                        self.mark_newly_found_ptr(val);
+                    }
                 }
             }
         }
     }
 
     fn is_object_reachable(info: &AllocInfo) -> bool {
-        let stack_refs = info.root_marks();
-        let refs_in_gc = info.branch_marks();
         let isolated_refs = info.isolated_marks();
-        let known_refs = stack_refs + refs_in_gc + isolated_refs;
         let total_refs = info.ref_count();
         // assert!(stack_refs + refs_in_gc <= total_refs,
         //         "Found more references to object than were made.
@@ -374,11 +313,7 @@ impl Collector {
         // zombie values of an address are found on the stack.
         // let heap_refs = total_refs - stack_refs - refs_in_gc;
         // If we know it is reachable or the only refs are hidden in the heap
-        if total_refs == isolated_refs {
-            false
-        } else {
-            info.is_marked_reachable() || total_refs > known_refs
-        }
+        total_refs > isolated_refs || info.is_marked_reachable()
     }
 
     fn sweep(&mut self) {

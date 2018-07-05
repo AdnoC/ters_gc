@@ -22,8 +22,7 @@ impl<T> AsConstPtr for NonNull<T> {
 pub(crate) struct AllocInfo {
     pub ptr: NonNull<UntypedGcBox>,
     rebox: fn(NonNull<UntypedGcBox>),
-    branches: Cell<usize>, // # of marks from ptrs stored in tracked objects
-    roots: Cell<usize>,    // # of marks from ptrs stored in stack (since we can't traverse heap)
+    reachable: Cell<bool>,    // # of marks from ptrs stored in stack (since we can't traverse heap)
     isolated: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
     refs: fn(NonNull<UntypedGcBox>) -> usize,
     trace: fn(NonNull<UntypedGcBox>) -> Tracer,
@@ -34,19 +33,15 @@ impl AllocInfo {
         AllocInfo {
             ptr: store_single_value(value).as_untyped(),
             rebox: get_rebox::<T>(),
-            branches: Cell::new(0),
-            roots: Cell::new(0),
+            reachable: Cell::new(false),
             isolated: Cell::new(0),
             refs: get_refs_accessor::<T>(),
             trace: get_tracer::<T>(),
         }
     }
 
-    pub fn mark_branch(&self) {
-        self.branches.set(self.branches.get() + 1);
-    }
-    pub fn mark_root(&self) {
-        self.roots.set(self.roots.get() + 1);
+    pub fn mark_reachable(&self) {
+        self.reachable.set(true);
     }
     pub fn mark_isolated(&self) {
         self.isolated.set(self.isolated.get() + 1);
@@ -56,21 +51,12 @@ impl AllocInfo {
     }
 
     pub fn unmark(&self) {
-        self.branches.set(0);
-        self.roots.set(0);
+        self.reachable.set(false);
         self.isolated.set(0);
     }
 
     pub fn is_marked_reachable(&self) -> bool {
-        self.branches.get() > 0 || self.roots.get() > 0
-    }
-
-    pub fn root_marks(&self) -> usize {
-        self.roots.get()
-    }
-
-    pub fn branch_marks(&self) -> usize {
-        self.branches.get()
+        self.reachable.get()
     }
 
     pub fn isolated_marks(&self) -> usize {
