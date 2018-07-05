@@ -1,3 +1,46 @@
+//! A "TinEe RuSt Garbage Collector"
+//!
+//! ("tiny" is deliberately misspelled for the sake of the acronym)
+//!
+//! A toy project implementing a garbage collecting allocator in the rust
+//! programming language.
+//!
+//! Use at your own risk: The author is neither experienced with writing
+//! unsafe rust nor has he studied garbage collectors.
+//!
+//! Having said that, it should be stable enough to play around with and
+//! use for small projects.
+//!
+//! A short usage example:
+//!
+//! ```
+//! use ters_gc::Collector;
+//! use std::cell::RefCell;
+//!
+//! // Create the collector that will keep track of things and reclaim
+//! // unused allocations.
+//! let mut collector = Collector::new();
+//!
+//! // Run some code that needs to allocate from the collector
+//! unsafe {
+//!     collector.run_with_gc(|mut p| {
+//!         // Store something to be tracked for usage
+//!         let important_data = p.store(RefCell::new(42));
+//!         // Do stuff with the data
+//!         *important_data.borrow_mut() = 3;
+//!         assert_eq!(3, *important_data.borrow());
+//!
+//!         let compute_business_stuff = |_, _| { /* Stuff with lots of allocations */ };
+//!         let _game_changing_results = compute_business_stuff(&mut p, important_data);
+//!
+//!         // Now that we are no longer using the stuff from `compute_business_stuff`,
+//!         // lets free everything that `_game_changing_results` isn't using.
+//!         p.run();
+//!     });
+//! }
+//! ```
+//!
+
 enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
 pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
@@ -14,13 +57,18 @@ mod reg_flush {
     }
 }
 
+
 use allocator::AllocInfo;
 use allocator::Allocator;
-pub use ptr::Gc;
 use ptr::GcBox;
 use std::ptr::NonNull;
 use std::marker::PhantomData;
 use traceable::TraceTo;
+
+pub use ptr::Gc;
+pub mod trace {
+    pub use traceable::{TraceTo, Tracer};
+}
 
 trait AsTyped {
     fn as_typed<T>(&self) -> NonNull<GcBox<T>>;
@@ -523,4 +571,31 @@ mod tests {
 
         unsafe { col.run_with_gc(body) };
     }
+
+    // #[test]
+    // fn min_cycle() {
+    //     use std::cell::RefCell;
+    //     let mut col = Collector::new();
+    //     struct CyclicStruct<'a> {
+    //         other: RefCell<Option<Gc<'a, CyclicStruct<'a>>>>,
+    //     }
+    //     impl<'a> TraceTo for CyclicStruct<'a> {
+    //         fn trace_to(&self, tracer: &mut trace::Tracer) {
+    //             self.other.trace_to(tracer);
+    //         }
+    //     }
+    //     let body = |mut proxy: Proxy| {
+    //         let compute_data = |p| {
+    //             let thing1 = proxy.store((RefCell::new(None)));
+    //             let thing2 = proxy.store(RefCell::new(Some(thing1.clone())));
+    //             let some_two = Some(thing2.clone())
+    //             *thing1.borrow_mut() = some_two;
+    //         };
+    //         compute_data(&proxy);
+    //         proxy.run();
+    //         assert_eq!(num_tracked_objs(&proxy), 0);
+    //     };
+    //
+    //     unsafe { col.run_with_gc(body) };
+    // }
 }
