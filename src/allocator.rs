@@ -41,9 +41,6 @@ impl AllocInfo {
             trace: get_tracer::<T>(),
         }
     }
-    pub fn const_ptr(&self) -> *const UntypedGcBox{
-        self.ptr.as_const_ptr()
-    }
 
     pub fn mark_branch(&self) {
         self.branches.set(self.branches.get() + 1);

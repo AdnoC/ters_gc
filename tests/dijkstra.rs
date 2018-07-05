@@ -9,7 +9,6 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
 use terse::traceable::{TraceTo, Tracer};
 use terse::*;
 

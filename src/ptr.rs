@@ -613,19 +613,19 @@ mod tests {
     #[test]
     fn variance_works() {
         // Check compile-test for cases that are illegal
-        fn variant_with_gc() {
-            fn expect<'a>(_: &'a i32, _: Gc<&'a i32>) { unimplemented!() }
-            fn provide(m: Gc<&'static i32>) { let val = 13; expect(&val, m); }
+        fn _variant_with_gc() {
+            fn _expect<'a>(_: &'a i32, _: Gc<&'a i32>) { unimplemented!() }
+            fn _provide(m: Gc<&'static i32>) { let val = 13; _expect(&val, m); }
         }
 
-        fn variant_with_weak() {
-            fn expect<'a>(_: &'a i32, _: Weak<&'a i32>) { unimplemented!() }
-            fn provide(m: Weak<&'static i32>) { let val = 13; expect(&val, m); }
+        fn _variant_with_weak() {
+            fn _expect<'a>(_: &'a i32, _: Weak<&'a i32>) { unimplemented!() }
+            fn _provide(m: Weak<&'static i32>) { let val = 13; _expect(&val, m); }
         }
 
-        fn variant_with_safe() {
-            fn expect<'a>(_: &'a i32, _: Safe<&'a i32>) { unimplemented!() }
-            fn provide(m: Safe<&'static i32>) { let val = 13; expect(&val, m); }
+        fn _variant_with_safe() {
+            fn _expect<'a>(_: &'a i32, _: Safe<&'a i32>) { unimplemented!() }
+            fn _provide(m: Safe<&'static i32>) { let val = 13; _expect(&val, m); }
         }
     }
 

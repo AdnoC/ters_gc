@@ -511,7 +511,7 @@ mod tests {
         }
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
-            let root = eat_stack_and_exec(6, || {
+            let _root = eat_stack_and_exec(6, || {
                 let leaf = proxy.store(List { ptr: None });
                 let root = proxy.store(List { ptr: Some(leaf) });
                 Box::new(root)
