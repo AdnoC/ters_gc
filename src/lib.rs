@@ -2,10 +2,12 @@
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
+//! FIXME MEMORY SAFETY HOLE: Weak::get. `T` should only be accessable after conversion to `Gc` via `upgrade`
+//!
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
 //!
 //! A toy project implementing a garbage collecting allocator in the rust
-//! programming language.
+//! programming language. Based loosely on the <NAME>'s [`Tiny Garbage Collector`].
 //!
 //! Use at your own risk: The author is neither experienced with writing
 //! unsafe rust nor has he studied garbage collectors.
@@ -72,6 +74,10 @@
 //! to communicate with it and get it to do things like store an object
 //! or reclaim unused memory you have to go through a [`Proxy`].
 //!
+//! Collection of unreachable memory only happens when either you call
+//! [`Proxy::run`], or you store something in the gc heap and the heap is above
+//! a size threshold.
+//!
 //! The primary smart pointer type is [`Gc`]. It keeps the allocated memory alive
 //! and dereferences to a shared reference.
 //!
@@ -85,15 +91,25 @@
 //! if the underlying object has been freed. Just in case something goes wrong
 //! and an object is accidentally freed.
 //!
+//! # Storing Custom Structs
 //!
-//!
-//!
+//! All types stored in the gc heap must implement the [`TaceTo`] trait, which
+//! tells the collector where in your struct it can find pointers to other
+//! things stored in the gc heap.
 //!
 //! # Limitations
 //!
-//! Cannot leak [`Gc`]s outside of the gc heap // FIXME wording
+//! * You can't leak [`Gc`]s and [`Safe`]s outside of the gc heap
 //!
-//! Can't run the gc while holding a reference through a Weak (via Weak::get) // FIXME wording
+//! Calling [`mem::forget`] on a [`Gc`] will prevent the object it is pointing
+//! to from being reclaimed, leaking that memory.
+//!
+//! The collector knows how many pointers to an object exist. If it can't
+//! find all of them it assumes the ones it can't find are somewhere
+//! in the heap, but that the user still has a way of reaching it (like through
+//! a [`Box`]).
+//!
+//!
 //!
 //!
 //! [`Collector`]: struct.Collector.html
@@ -101,6 +117,11 @@
 //! [`Gc`]: ptr/struct.Gc.html
 //! [`Weak`]: ptr/struct.Weak.html
 //! [`Safe`]: ptr/struct.Safe.html
+//! [`TraceTo`]: traceable/trait.TraceTo.html
+//! [`Proxy::run`]: http://example.com // FIXME
+//! [`mem::forget`]: http://example.com // FIXME
+//! [`Box`]: http://example.com // FIXME
+//! [`Tiny Garbage Collector`]: http://example.com // FIXME
 
 enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
 pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
