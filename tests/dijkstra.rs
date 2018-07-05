@@ -17,58 +17,6 @@ use terse::*;
 
 type GcNode<'a> = Gc<'a, Node<'a>>;
 type GcEdge<'a> = Gc<'a, Edge<'a>>;
-//
-// #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-// struct PrintWrapper<P>
-// where
-//     P: Deref,
-//     <P as Deref>::Target: fmt::Debug,
-// {
-//     ptr: P,
-// }
-//
-// impl<P> fmt::Debug for PrintWrapper<P>
-// where
-//     P: Deref,
-//     <P as Deref>::Target: fmt::Debug,
-// {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         println!("pw println");
-//         f.debug_struct("PrintWrapp")
-//             .field("ptr", &&*self.ptr)
-//             .finish()
-//     }
-// }
-//
-// impl<P> Deref for PrintWrapper<P>
-// where
-//     P: Deref,
-//     <P as Deref>::Target: fmt::Debug,
-// {
-//     type Target = <P as Deref>::Target;
-//
-//     fn deref(&self) -> &Self::Target {
-//         &*self.ptr
-//     }
-// }
-// impl<P> TraceTo for PrintWrapper<P>
-// where
-//     P: Deref + TraceTo,
-//     <P as Deref>::Target: fmt::Debug,
-// {
-//     fn trace_to(&self, tracer: &mut Tracer) {
-//         self.ptr.trace_to(tracer);
-//     }
-// }
-
-// impl<P> PartialEq for PrintWrapper<P>
-// where P: Deref + PartialEq, <P as Deref>::Target: fmt::Debug {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.ptr == other.ptr
-//     }
-// }
-// impl<P> Eq for PrintWrapper<P>
-// where P: Deref + PartialEq, <P as Deref>::Target: fmt::Debug {}
 
 #[derive(Default)]
 struct Graph<'a> {
@@ -243,7 +191,8 @@ impl<'a> fmt::Debug for Node<'a> {
 
 impl<'a> PartialEq for Node<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && &*self.adjacencies.borrow() == &*other.adjacencies.borrow()
+        // Only check name since if we have a cycle we'd stack overflow otherwise
+        self.name == other.name
     }
 }
 impl<'a> Eq for Node<'a> {}
@@ -333,6 +282,7 @@ const _SAN: &str = "San Diego";
 
 #[test]
 fn dijkstra_is_cool() {
+    println!("dijkstra is super cool");
     let body = |mut proxy: Proxy| {
         let mut graph = Graph::new();
 
