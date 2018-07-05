@@ -1,5 +1,5 @@
 [package]
-name = "terse"
+name = "ters_gc"
 version = "0.1.0"
 authors = ["AdnoC <adam.r.cutler@gmail.com>"]
 

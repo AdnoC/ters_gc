@@ -1,5 +1,5 @@
-extern crate terse;
-use terse::*;
+extern crate ters_gc;
+use ters_gc::*;
 
 fn lifetimes_are_properly_constrained() {
     use ::std::mem::drop;

@@ -1,5 +1,5 @@
-extern crate terse;
-use terse::ptr::{Gc, Weak, Safe};
+extern crate ters_gc;
+use ters_gc::ptr::{Gc, Weak, Safe};
 
 fn variant_with_gc() {
     fn expect<'a>(_: &'a i32, _: Gc<&'a i32>) { unimplemented!() }
