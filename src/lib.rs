@@ -2,12 +2,14 @@
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
-//! FIXME MEMORY SAFETY HOLE: Weak::get. `T` should only be accessable after conversion to `Gc` via `upgrade`
+//! FIXME MEMORY SAFETY HOLE: Weak::get. `T` should only be accessible after conversion to `Gc` via `upgrade`
 //!
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
+//! *TODO: Ensure Proxy is !Send*
 //!
-//! A toy project implementing a garbage collecting allocator in the rust
-//! programming language. Based loosely on the <NAME>'s [`Tiny Garbage Collector`].
+//! A toy project implementing a mark-and-sweep garbage collecting allocator
+//! in the rust programming language.
+//! Based loosely on  <NAME>'s [`Tiny Garbage Collector`].
 //!
 //! Use at your own risk: The author is neither experienced with writing
 //! unsafe rust nor has he studied garbage collectors.
@@ -108,6 +110,9 @@
 //! find all of them it assumes the ones it can't find are somewhere
 //! in the heap, but that the user still has a way of reaching it (like through
 //! a [`Box`]).
+//!
+//! * The garbage collector is for single threaded use only
+//!
 //!
 //!
 //!
