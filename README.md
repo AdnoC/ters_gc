@@ -68,23 +68,29 @@ let meaning = unsafe { col.run_with_gc(find_meaning_of_life) };
 
 assert_eq!(meaning, 42);
 ```
-# FAQ
+# Collection Overview
 
-* Doesn't rust's lifetimes prevent something like this? How does it placate the
-    borrow checker?
+The collector determines reachability based on two sources of information: reference
+counting and inter-object connections. It also works with an assumption:
+all references stored outside the gc heap are reachable.
 
-From the borrow checker's point of view all references to objects in the gc heap
-have the same lifetime, which is bounded by the life of the [`Proxy`] object that
-created it.
+[`Gc`]s act like [`Rc`]s: they increment the reference count on `clone` and
+decrement it on `drop`.
 
-* Won't there be use-after-free errors if // FIXME wording
+The [`TraceTo`] trait tells the collector what other objects in the gc heap
+an object has references to. By iterating over all the objects in the gc heap,
+you can determine the opposite, how many objects in the gc heap has references
+to a particular object.
 
-A garbage collector's job is to clean up allocations once you don't need them.
-But it doesn't touch something while you're still using it. As long as you have
-a reference to an object it is guaranteed to be valid (modulo implementation bugs).
+If at least one reference to an object is not stored within the gc heap, that
+object is considered a root and reachable. Children of a reachable object
+are themselves reachable. So, you recurs down the tree and mark all the children
+who were marked unreachable as reachable.
 
+Once all that is finished, the only things still marked unreachable will be
+the things that _are_ actually unreachable, and can be safely freed.
 
-# Overview
+# Type Overview
 
 The [`Collector`] contains the garbage collector's internal state. In order
 to communicate with it and get it to do things like store an object
@@ -125,6 +131,26 @@ find all of them it assumes the ones it can't find are somewhere
 in the heap, but that the user still has a way of reaching it (like through
 a [`Box`]).
 
+# FAQ
+
+* Doesn't rust's lifetimes prevent something like this? How does it placate the
+    borrow checker?
+
+From the borrow checker's point of view all references to objects in the gc heap
+have the same lifetime, which is bounded by the life of the [`Proxy`] object that
+created it.
+
+* Won't there be use-after-free errors if // FIXME wording
+
+A garbage collector's job is to clean up allocations once you don't need them.
+But it doesn't touch something while you're still using it. As long as you have
+a reference to an object it is guaranteed to be valid (modulo implementation bugs).
+
+* If something goes wrong will I get segfaults?
+
+Probably not. Any problems are much more likely to result in memory leaks
+than dangling pointers.
+
 
 
 
@@ -137,4 +163,5 @@ a [`Box`]).
 [`Proxy::run`]: http://example.com // FIXME
 [`mem::forget`]: http://example.com // FIXME
 [`Box`]: http://example.com // FIXME
+[`Rc`]: http://example.com // FIXME
 [`Tiny Garbage Collector`]: http://example.com // FIXME

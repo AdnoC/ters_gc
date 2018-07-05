@@ -4,6 +4,9 @@
 //!
 //! FIXME MEMORY SAFETY HOLE: Weak::get. `T` should only be accessible after conversion to `Gc` via `upgrade`
 //!
+//! *TODO: Make run_with_gc safe?*
+//! *TODO: Make Weak just a Gc with an Rc<Cell<bool>>*
+//! *TODO: Make Safe just a Weak with impl TraceTo*
 //! *TODO: Remove all stack-related mechanisms*
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
 //! *TODO: Ensure Proxy is !Send*
@@ -71,7 +74,7 @@
 //! assert_eq!(meaning, 42);
 //! ```
 //!
-//! # Overview
+//! # Type Overview
 //!
 //! The [`Collector`] contains the garbage collector's internal state. In order
 //! to communicate with it and get it to do things like store an object
@@ -99,6 +102,8 @@
 //! All types stored in the gc heap must implement the [`TaceTo`] trait, which
 //! tells the collector where in your struct it can find pointers to other
 //! things stored in the gc heap.
+//!
+//! *TODO: Mention that most standard types have it implemented*
 //!
 //! # Limitations
 //!
