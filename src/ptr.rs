@@ -5,11 +5,15 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::marker;
-use AsTyped;
 use UntypedGcBox;
 
 /// TODO: Implement traits:
-/// std::fmt::Pointer
+/// Clone | w s
+/// PartialEq | w s
+/// Eq | w s
+/// PartialOrd | w s
+/// Ord | w s
+/// Debug g w s
 
 /// TODO: Send & Sync safety
 
@@ -126,7 +130,7 @@ impl<T> TrackingRef<T> {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually?
+// #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually? // FIXME Delete
 pub struct Gc<'arena, T: 'arena> {
     _marker: PhantomData<&'arena T>,
     ptr: NonNull<GcBox<T>>, // TODO Make NonNull<GcBox<T>>
@@ -193,20 +197,95 @@ impl<'a, T: 'a> Drop for Gc<'a, T> {
         Gc::get_gc_box(self).decr_ref();
     }
 }
-impl<'a, T: 'a> Clone for Gc<'a, T> {
-    fn clone(&self) -> Self {
-        let gc = Gc {
-            _marker: PhantomData,
-            ptr: self.ptr,
-        };
-        Gc::get_gc_box(&gc).incr_ref();
-        gc
-    }
-}
+/// Impls that aren't part of the core functionality of the struct, but
+/// are implemented since it is a smart pointer
+mod gc_impls {
+    use super::{Gc, Safe, Weak};
+    use std::hash::{Hasher, Hash};
+    use std::cmp::Ordering;
+    use std::fmt;
+    use std::borrow;
+    // impl functions are marked inline when they are for `Rc`
 
-impl<'a, T: 'a> AsRef<T> for Gc<'a, T> {
-    fn as_ref(&self) -> &T {
-        &**self
+    impl<'a, T: 'a> Clone for Gc<'a, T> {
+        fn clone(&self) -> Self {
+            use std::marker::PhantomData;
+            let gc = Gc {
+                _marker: PhantomData,
+                ptr: self.ptr,
+            };
+            Gc::get_gc_box(&gc).incr_ref();
+            gc
+        }
+    }
+    impl<'a, T: 'a> AsRef<T> for Gc<'a, T> {
+        fn as_ref(&self) -> &T {
+            &**self
+        }
+    }
+    impl<'a, T: 'a + fmt::Debug> fmt::Debug for Gc<'a, T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fmt::Debug::fmt(&**self, f)
+        }
+    }
+    impl<'a, T: 'a + fmt::Display> fmt::Display for Gc<'a, T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fmt::Display::fmt(&**self, f)
+        }
+    }
+    impl<'a, T: 'a> fmt::Pointer for Gc<'a, T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fmt::Pointer::fmt(&(&**self as *const T), f)
+        }
+    }
+    impl<'a, T: 'a + Hash> Hash for Gc<'a, T> {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            (**self).hash(state)
+        }
+    }
+    impl<'a, T: 'a> borrow::Borrow<T> for Gc<'a, T> {
+        fn borrow(&self) -> &T {
+            &**self
+        }
+    }
+    impl<'a, T: 'a + PartialEq> PartialEq for Gc<'a, T> {
+        #[inline(always)]
+        fn eq(&self, other: &Gc<'a, T>) -> bool {
+            (**self).eq(&**other)
+        }
+        #[inline(always)]
+        fn ne(&self, other: &Gc<'a, T>) -> bool {
+            (**self).ne(&**other)
+        }
+    }
+    impl<'a, T: 'a + Eq> Eq for Gc<'a, T> {}
+    impl<'a, T: 'a + PartialOrd> PartialOrd for Gc<'a, T> {
+        #[inline(always)]
+        fn partial_cmp(&self, other: &Gc<'a, T>) -> Option<Ordering> {
+            (**self).partial_cmp(&**other)
+        }
+        #[inline(always)]
+        fn lt(&self, other: &Gc<'a, T>) -> bool {
+            **self < **other
+        }
+        #[inline(always)]
+        fn le(&self, other: &Gc<'a, T>) -> bool {
+            **self <= **other
+        }
+        #[inline(always)]
+        fn gt(&self, other: &Gc<'a, T>) -> bool {
+            **self > **other
+        }
+        #[inline(always)]
+        fn ge(&self, other: &Gc<'a, T>) -> bool {
+            **self >= **other
+        }
+    }
+    impl<'a, T: 'a + Ord> Ord for Gc<'a, T> {
+        #[inline]
+        fn cmp(&self, other: &Gc<'a, T>) -> Ordering {
+            (**self).cmp(&**other)
+        }
     }
 }
 
