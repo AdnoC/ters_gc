@@ -2,6 +2,8 @@
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
+//! *TODO: CHECK THAT ALL LINKS ARE VALID*
+//!
 //! A toy project implementing a garbage collecting allocator in the rust
 //! programming language.
 //!
@@ -14,32 +16,91 @@
 //! A short usage example:
 //!
 //! ```
-//! use ters_gc::Collector;
+//! use ters_gc::{Collector, Proxy, Gc, trace};
 //! use std::cell::RefCell;
 //!
-//! // Create the collector that will keep track of things and reclaim
-//! // unused allocations.
-//! let mut collector = Collector::new();
 //!
-//! // Run some code that needs to allocate from the collector
-//! unsafe {
-//!     collector.run_with_gc(|mut p| {
-//!         // Store something to be tracked for usage
-//!         let important_data = p.store(RefCell::new(42));
-//!         // Do stuff with the data
-//!         *important_data.borrow_mut() = 3;
-//!         assert_eq!(3, *important_data.borrow());
+//! // A struct that can hold references to itself
+//! struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);
 //!
-//!         let compute_business_stuff = |_, _| { /* Stuff with lots of allocations */ };
-//!         let _game_changing_results = compute_business_stuff(&mut p, important_data);
-//!
-//!         // Now that we are no longer using the stuff from `compute_business_stuff`,
-//!         // lets free everything that `_game_changing_results` isn't using.
-//!         p.run();
-//!     });
+//! // All things in the gc heap need to impl `TraceTo`
+//! impl<'a> trace::TraceTo for CyclicStruct<'a> {
+//!     fn trace_to(&self, tracer: &mut trace::Tracer) {
+//!         // Tell the tracer where to find our gc pointer
+//!         self.0.trace_to(tracer);
+//!     }
 //! }
+//!
+//! // Do some computations that are best expressed with a cyclic data structure
+//! fn compute_cyclic_data(proxy: &mut Proxy) {
+//!     let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
+//!     let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+//!     *thing1.0.borrow_mut() = Some(thing2.clone());
+//! }
+//!
+//! // Make a new collector to keep the gc state
+//! let mut col = Collector::new();
+//!
+//! // Because of how unsafe scoping works, you shouldn't make a lambda
+//! // within the arguments of `run_with_gc`, otherwise you might stray
+//! // outside of safe rust.
+//! fn find_meaning_of_life(mut proxy: Proxy) -> i32 {
+//!
+//!     // Do some calculations. Do it later in the stack so that the pointers
+//!     // to gc objects aren't in the used portion of the stack when collecting.
+//!     proxy.exec_with_stack_barrier(compute_cyclic_data);
+//!
+//!     // Collect garbage
+//!     proxy.run();
+//!
+//!     // And we've successfully cleaned up the unused cyclic data
+//!     assert_eq!(proxy.num_tracked(), 0);
+//!
+//!     // Return
+//!     42
+//! }
+//!
+//! // Find out the meaning of life, and allow use of the gc while doing so
+//! let meaning = unsafe { col.run_with_gc(find_meaning_of_life) };
+//!
+//! assert_eq!(meaning, 42);
 //! ```
 //!
+//! # Overview
+//!
+//! The [`Collector`] contains the garbage collector's internal state. In order
+//! to communicate with it and get it to do things like store an object
+//! or reclaim unused memory you have to go through a [`Proxy`].
+//!
+//! The primary smart pointer type is [`Gc`]. It keeps the allocated memory alive
+//! and dereferences to a shared reference.
+//!
+//! The [`Weak`] pointer, on the other hand, isn't counted during reachability
+//! analysis. You can have thousands of them, but if they are the only things
+//! referencing an object, that object will be freed next time the collector
+//! is run. It knows when the pointed-to object has been freed and will deny
+//! access after that occurs.
+//!
+//! The [`Safe`] pointer is  tracked during reachability analysis, and knows
+//! if the underlying object has been freed. Just in case something goes wrong
+//! and an object is accidentally freed.
+//!
+//!
+//!
+//!
+//!
+//! # Limitations
+//!
+//! Cannot leak [`Gc`]s outside of the gc heap // FIXME wording
+//!
+//! Can't run the gc while holding a reference through a Weak (via Weak::get) // FIXME wording
+//!
+//!
+//! [`Collector`]: struct.Collector.html
+//! [`Proxy`]: struct.Proxy.html
+//! [`Gc`]: ptr/struct.Gc.html
+//! [`Weak`]: ptr/struct.Weak.html
+//! [`Safe`]: ptr/struct.Safe.html
 
 enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
 pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
@@ -371,6 +432,13 @@ impl<'a> Proxy<'a> {
     pub fn num_tracked(&self) -> usize {
         self.collector.num_tracked()
     }
+
+    // Add an extra stack frame so that things 1 function deep can be reclaimed
+    #[inline(never)]
+    pub fn exec_with_stack_barrier<R, F>(&mut self, procedure: F) -> R
+    where F: FnOnce(&mut Proxy) -> R {
+        procedure(self)
+    }
 }
 
 #[cfg(test)]
@@ -572,30 +640,54 @@ mod tests {
         unsafe { col.run_with_gc(body) };
     }
 
-    // #[test]
-    // fn min_cycle() {
-    //     use std::cell::RefCell;
-    //     let mut col = Collector::new();
-    //     struct CyclicStruct<'a> {
-    //         other: RefCell<Option<Gc<'a, CyclicStruct<'a>>>>,
-    //     }
-    //     impl<'a> TraceTo for CyclicStruct<'a> {
-    //         fn trace_to(&self, tracer: &mut trace::Tracer) {
-    //             self.other.trace_to(tracer);
-    //         }
-    //     }
-    //     let body = |mut proxy: Proxy| {
-    //         let compute_data = |p| {
-    //             let thing1 = proxy.store((RefCell::new(None)));
-    //             let thing2 = proxy.store(RefCell::new(Some(thing1.clone())));
-    //             let some_two = Some(thing2.clone())
-    //             *thing1.borrow_mut() = some_two;
-    //         };
-    //         compute_data(&proxy);
-    //         proxy.run();
-    //         assert_eq!(num_tracked_objs(&proxy), 0);
-    //     };
-    //
-    //     unsafe { col.run_with_gc(body) };
-    // }
+    #[test]
+    fn min_cycle() {
+        use std::cell::RefCell;
+
+
+        // A struct that can hold references to itself
+        struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);
+
+        // All things in the gc heap need to impl `TraceTo`
+        impl<'a> TraceTo for CyclicStruct<'a> {
+            fn trace_to(&self, tracer: &mut trace::Tracer) {
+                // Tell the tracer where to find our gc pointer
+                self.0.trace_to(tracer);
+            }
+        }
+
+        // Do some computations that are best expressed with a cyclic data structure
+        fn compute_cyclic_data(proxy: &mut Proxy) {
+            let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
+            let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+            *thing1.0.borrow_mut() = Some(thing2.clone());
+        }
+
+        // Make a new collector to keep the gc state
+        let mut col = Collector::new();
+
+        // Because of how unsafe scoping works, you shouldn't make a lambda
+        // within the arguments of `run_with_gc`, otherwise you might stray
+        // outside of safe rust.
+        fn find_meaning_of_life(mut proxy: Proxy) -> i32 {
+
+            // Do some calculations. Do it later in the stack so that the pointers
+            // to gc objects aren't in the used portion of the stack when collecting.
+            proxy.exec_with_stack_barrier(compute_cyclic_data);
+
+            // Collect garbage
+            proxy.run();
+
+            // And we've successfully cleaned up the unused cyclic data
+            assert_eq!(proxy.num_tracked(), 0);
+
+            // Return
+            42
+        }
+
+        // Find out the meaning of life, and allow use of the gc while doing so
+        let meaning = unsafe { col.run_with_gc(find_meaning_of_life) };
+
+        assert_eq!(meaning, 42);
+    }
 }
