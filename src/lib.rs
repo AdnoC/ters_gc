@@ -53,7 +53,7 @@
 //!
 //!     // Do some calculations. Do it later in the stack so that the pointers
 //!     // to gc objects aren't in the used portion of the stack when collecting.
-//!     proxy.exec_with_stack_barrier(compute_cyclic_data);
+//!     compute_cyclic_data(&mut proxy); // FIXME: inline the function
 //!
 //!     // Collect garbage
 //!     proxy.run();
@@ -135,16 +135,6 @@ pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 mod allocator;
 pub mod ptr;
 pub mod traceable;
-mod reg_flush {
-    use BoxedCollector;
-    extern "C" {
-        pub(crate) fn flush_registers_and_call(
-            callback: extern "C" fn(*mut BoxedCollector),
-            data: *mut BoxedCollector,
-        );
-    }
-}
-
 
 use allocator::AllocInfo;
 use allocator::Allocator;
@@ -175,14 +165,6 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
     }
 }
 
-macro_rules! stack_ptr {
-    () => {{
-        let a = 0usize; // usize so that it is aligned
-        StackPtr(&a)
-    }};
-}
-
-struct StackPtr(*const usize);
 
 pub struct Collector {
     allocator: Allocator,
@@ -190,7 +172,6 @@ pub struct Collector {
     // load_factor: f64,
     sweep_factor: f64,
     paused: bool,
-    stack_bottom: StackPtr,
 }
 
 impl Collector {
@@ -201,17 +182,12 @@ impl Collector {
             // load_factor: 0.9,
             sweep_factor: 0.5,
             paused: false,
-            // This is ok since it is only used within a `run_with_gc` call,
-            // which sets it to a valid value.
-            // TODO: MAKE THIS THE CASE
-            stack_bottom: StackPtr(0 as *const _),
         }
     }
 
     /// Unsafe because there is an unsafe hole in garbage collection that cannot
     /// be fixed. Namely, you cannot store pointers to tracked objects on the heap.
     pub unsafe fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
-        self.stack_bottom = stack_ptr!();
         self.inner_run_with_gc(func)
     }
 
@@ -234,23 +210,7 @@ impl Collector {
         self.sweep();
     }
 
-    fn mark(&mut self) {
-        unsafe {
-            ::reg_flush::flush_registers_and_call(
-                Collector::mark_landingpad,
-                self as *mut Collector as *mut _,
-            )
-        };
-    }
-
-    extern "C" fn mark_landingpad(data: *mut BoxedCollector) {
-        let data = data as *mut Collector;
-        let collector: &mut Collector = unsafe { &mut *data };
-        let stack_top = stack_ptr!();
-        collector.mark_impl(stack_top);
-    }
-
-    fn mark_impl(&self, _stack_top: StackPtr) {
+    fn mark(&self) {
         for info in self.allocator.items.values() {
             self.mark_island_ptr(info.ptr);
         }
@@ -263,17 +223,11 @@ impl Collector {
         }
     }
 
-    // ptr MUST be a valid tracked object
     fn mark_island_ptr(&self, ptr: NonNull<UntypedGcBox>) {
         // assert!(self.allocator.is_ptr_in_range(ptr));
 
-        let mut children = None;
         if let Some(info) = self.allocator.info_for_ptr(ptr.as_ptr()) {
-            children = Some(info.children());
-        }
-
-        if let Some(children) = children {
-            for val in children {
+            for val in info.children() {
                 if let Some(child) = self.allocator.info_for_ptr(val.as_ptr()) {
                     child.mark_isolated();
                 }
@@ -284,13 +238,8 @@ impl Collector {
     fn mark_newly_found_ptr(&self, ptr: NonNull<UntypedGcBox>) {
         // assert!(self.allocator.is_ptr_in_range(ptr));
 
-        let mut children = None;
         if let Some(info) = self.allocator.info_for_ptr(ptr.as_ptr()) {
-            children = Some(info.children());
-        }
-
-        if let Some(children) = children {
-            for val in children {
+            for val in info.children() {
                 if let Some(child) = self.allocator.info_for_ptr(val.as_ptr()) {
                     if !child.is_marked_reachable() {
                         child.unmark_isolated();
@@ -392,13 +341,6 @@ impl<'a> Proxy<'a> {
     }
     pub fn num_tracked(&self) -> usize {
         self.collector.num_tracked()
-    }
-
-    // Add an extra stack frame so that things 1 function deep can be reclaimed
-    #[inline(never)]
-    pub fn exec_with_stack_barrier<R, F>(&mut self, procedure: F) -> R
-    where F: FnOnce(&mut Proxy) -> R {
-        procedure(self)
     }
 }
 
@@ -634,7 +576,7 @@ mod tests {
 
             // Do some calculations. Do it later in the stack so that the pointers
             // to gc objects aren't in the used portion of the stack when collecting.
-            proxy.exec_with_stack_barrier(compute_cyclic_data);
+            compute_cyclic_data(&mut proxy); // FIXME: inline the function
 
             // Collect garbage
             proxy.run();
