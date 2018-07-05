@@ -308,13 +308,17 @@ impl<'a, T: 'a> Weak<'a, T> {
     pub fn is_alive(&self) -> bool {
         self.weak_ptr.is_alive()
     }
-    pub fn get(&self) -> Option<&T> { // FIXME MEMORY SAFETY HOLE: `T` should only be accessable after conversion to `Gc` via `upgrade`
+
+    fn get(&self) -> Option<&T> {
         self.weak_ptr
             .get()
             .map(|gc_box| unsafe { (*gc_box).borrow() })
     }
     fn get_borrow(&self) -> &T {
-        self.get().expect("weak pointer was already dead")
+        self.weak_ptr
+            .get()
+            .map(|gc_box| unsafe { (*gc_box).borrow() })
+        .expect("weak pointer was already dead")
     }
 }
 
@@ -553,14 +557,14 @@ mod tests {
             let num = proxy.store(NoTrace(Cell::new(0)));
             let num_weak = Gc::downgrade(&num);
             {
-                let num_ref = num_weak.get().unwrap();
+                let num_ref = num_weak.upgrade().unwrap();
                 num_ref.0.set(num_ref.0.get() + 1);
             }
             let num = num_weak.upgrade().unwrap();
             num.0.set(num.0.get() + 1);
             let num_safe = Gc::to_safe(num);
             {
-                let num_ref = num_weak.get().unwrap();
+                let num_ref = num_weak.upgrade().unwrap();
                 num_ref.0.set(num_ref.0.get() + 1);
             }
             let num = Gc::from_safe(num_safe);
@@ -581,7 +585,7 @@ mod tests {
             });
             proxy.run();
             assert_eq!(proxy.num_tracked(), 0);
-            assert!(num_weak.get().is_none());
+            assert!(!num_weak.is_alive());
         };
 
         unsafe { col.run_with_gc(body) };
@@ -701,7 +705,7 @@ mod tests {
             let two = Gc::downgrade(&two);
             let other_two = Gc::downgrade(&other_two);
             // Clone
-            assert_eq!(1, *one.clone().get().unwrap());
+            assert_eq!(1, *one.clone().upgrade().unwrap());
             // Debug
             let one_debug = format!("{:?}", one);
             assert!(one_debug.contains("Weak"));

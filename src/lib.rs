@@ -2,7 +2,6 @@
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
-//! FIXME MEMORY SAFETY HOLE: Weak::get. `T` should only be accessible after conversion to `Gc` via `upgrade`
 //!
 //! *TODO: Make run_with_gc safe?*
 //! *TODO: Make Weak just a Gc with an Rc<Cell<bool>>*
