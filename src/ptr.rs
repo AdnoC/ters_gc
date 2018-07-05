@@ -4,7 +4,6 @@ use std::ptr::NonNull;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
-use std::marker;
 use UntypedGcBox;
 
 /// TODO: Implement traits:
@@ -319,10 +318,13 @@ impl<'a, T: 'a> Weak<'a, T> {
     }
 }
 
+/// Impls that aren't part of the core functionality of the struct, but
+/// are implemented since it is a smart pointer
 mod weak_impls {
     use super::Weak;
     use std::cmp::Ordering;
     use std::fmt;
+
     impl<'a, T: 'a> Clone for Weak<'a, T> {
         fn clone(&self) -> Self {
             Weak {
@@ -410,6 +412,9 @@ impl<'a, T: 'a> Safe<'a, T> {
     pub fn get(&self) -> Option<&T> {
         self.ptr.get()
     }
+    fn get_borrow(&self) -> &T {
+        self.get().expect("safe pointer was already dead")
+    }
     pub fn is_alive(&self) -> bool {
         self.ptr.is_alive()
     }
@@ -433,6 +438,79 @@ impl<'a, T: 'a> Drop for Safe<'a, T> {
             println!("forget gc");
         }
     }
+}
+
+/// Impls that aren't part of the core functionality of the struct, but
+/// are implemented since it is a smart pointer
+mod safe_impls {
+    use super::Safe;
+    use std::cmp::Ordering;
+    use std::fmt;
+
+    impl<'a, T: 'a + fmt::Debug> fmt::Debug for Safe<'a, T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self.get() {
+                Some(value) => {
+                    f.debug_struct("Safe")
+                        .field("value", value)
+                        .finish()
+                },
+                None => {
+                    struct DeadPlaceholder;
+
+                    impl fmt::Debug for DeadPlaceholder {
+                        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                            f.write_str("<dead>")
+                        }
+                    }
+
+                    f.debug_struct("Safe")
+                        .field("value", &DeadPlaceholder)
+                        .finish()
+                }
+            }
+        }
+    }
+    impl<'a, T: 'a + PartialEq> PartialEq for Safe<'a, T> {
+        #[inline(always)]
+        fn eq(&self, other: &Safe<'a, T>) -> bool {
+            *self.get_borrow() == *other.get_borrow()
+        }
+        #[inline(always)]
+        fn ne(&self, other: &Safe<'a, T>) -> bool {
+            *self.get_borrow() != *other.get_borrow()
+        }
+    }
+    impl<'a, T: 'a + Eq> Eq for Safe<'a, T> {}
+    impl<'a, T: 'a + PartialOrd> PartialOrd for Safe<'a, T> {
+        #[inline(always)]
+        fn partial_cmp(&self, other: &Safe<'a, T>) -> Option<Ordering> {
+            (*self.get_borrow()).partial_cmp(other.get_borrow())
+        }
+        #[inline(always)]
+        fn lt(&self, other: &Safe<'a, T>) -> bool {
+            *self.get_borrow() < *other.get_borrow()
+        }
+        #[inline(always)]
+        fn le(&self, other: &Safe<'a, T>) -> bool {
+            *self.get_borrow() <= *other.get_borrow()
+        }
+        #[inline(always)]
+        fn gt(&self, other: &Safe<'a, T>) -> bool {
+            *self.get_borrow() > *other.get_borrow()
+        }
+        #[inline(always)]
+        fn ge(&self, other: &Safe<'a, T>) -> bool {
+            *self.get_borrow() >= *other.get_borrow()
+        }
+    }
+    impl<'a, T: 'a + Ord> Ord for Safe<'a, T> {
+        #[inline]
+        fn cmp(&self, other: &Safe<'a, T>) -> Ordering {
+            (*self.get_borrow()).cmp(other.get_borrow())
+        }
+    }
+
 }
 
 #[cfg(test)]
