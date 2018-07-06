@@ -292,9 +292,8 @@ fn dijkstra_is_cool() {
     };
 
     let mut col = Collector::new();
-    unsafe {
-        col.run_with_gc(body);
-    }
+
+    col.run_with_gc(body);
 
     fn initialize_graph<'a>(proxy: &mut Proxy<'a>, graph: &mut Graph<'a>) {
         let dtw = graph.new_node(proxy, DTW);

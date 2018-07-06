@@ -373,7 +373,7 @@ mod tests {
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 0);
         };
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
             assert!(head.next.is_some());
         };
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -437,7 +437,7 @@ mod tests {
             prepend_ll!(); //(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), threshold + 1);
         };
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -470,13 +470,13 @@ mod tests {
             prepend_ll!(); //(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
         };
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
     fn returning_a_value_works() {
         let mut col = Collector::new();
-        let val = unsafe { col.run_with_gc(|_proxy| 42) };
+        let val = col.run_with_gc(|_proxy| 42);
         assert_eq!(val, 42);
     }
 
@@ -506,7 +506,7 @@ mod tests {
             assert_eq!(num_tracked_objs(&proxy), 0);
         };
 
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -531,7 +531,7 @@ mod tests {
             assert_eq!(num_tracked_objs(&proxy), 2);
         };
 
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]

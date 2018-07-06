@@ -546,7 +546,7 @@ mod tests {
             drop(num);
             assert_eq!(get_ref_num(&num2), 1);
         };
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -571,7 +571,7 @@ mod tests {
             assert_eq!(num.0.get(), 3);
         };
 
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -588,7 +588,7 @@ mod tests {
             assert!(!num_weak.is_alive());
         };
 
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -607,7 +607,7 @@ mod tests {
             assert!(num_safe.get().is_none());
         };
 
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -686,7 +686,7 @@ mod tests {
             assert_eq!(Ordering::Greater, two.cmp(&one));
         };
 
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -731,7 +731,7 @@ mod tests {
             assert_eq!(Ordering::Greater, two.cmp(&one));
         };
 
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 
     #[test]
@@ -776,6 +776,6 @@ mod tests {
             assert_eq!(Ordering::Greater, two.cmp(&one));
         };
 
-        unsafe { col.run_with_gc(body) };
+        col.run_with_gc(body);
     }
 }
