@@ -130,7 +130,7 @@ pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
 mod allocator;
 pub mod ptr;
-pub mod traceable;
+mod traceable;
 
 use allocator::AllocInfo;
 use allocator::Allocator;

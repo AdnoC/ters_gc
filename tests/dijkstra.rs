@@ -9,7 +9,7 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use ters_gc::traceable::{TraceTo, Tracer};
+use ters_gc::trace::{TraceTo, Tracer};
 use ters_gc::*;
 
 // NOTE: Might have problems with SmallVec not clearing values of `remove`d entries
