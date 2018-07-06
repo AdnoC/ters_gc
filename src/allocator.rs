@@ -21,11 +21,14 @@ impl<T> AsConstPtr for NonNull<T> {
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
     pub ptr: NonNull<UntypedGcBox>,
-    rebox: fn(NonNull<UntypedGcBox>),
+    // unsafe is because it must be called with accompanying pointer
+    rebox: unsafe fn(NonNull<UntypedGcBox>),
     reachable: Cell<bool>,    // # of marks from ptrs stored in stack (since we can't traverse heap)
     isolated: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
-    refs: fn(NonNull<UntypedGcBox>) -> usize,
-    trace: fn(NonNull<UntypedGcBox>) -> Tracer,
+    // unsafe is because it must be called with accompanying pointer
+    refs: unsafe fn(NonNull<UntypedGcBox>) -> usize,
+    // unsafe is because it must be called with accompanying pointer
+    trace: unsafe fn(NonNull<UntypedGcBox>) -> Tracer,
 }
 
 impl AllocInfo {
@@ -64,18 +67,24 @@ impl AllocInfo {
     }
 
     pub fn ref_count(&self) -> usize {
-        (self.refs)(self.ptr)
+        // Unsafe is fine since this is only called with the accompanying
+        // valid pointer.
+        unsafe { (self.refs)(self.ptr) }
     }
 
     pub(crate) fn children(&self) -> impl Iterator<Item = NonNull<UntypedGcBox>> {
-        let tracer = (self.trace)(self.ptr);
+        // Unsafe is fine since this is only called with the accompanying
+        // valid pointer.
+        let tracer = unsafe { (self.trace)(self.ptr) };
         tracer.results().map(|dest| dest.0)
     }
 }
 
 impl Drop for AllocInfo {
     fn drop(&mut self) {
-        (self.rebox)(self.ptr);
+        // This is used as the destructor for the pointer, so it should the only
+        // reference to the object.
+        unsafe { (self.rebox)(self.ptr) };
     }
 }
 
@@ -138,33 +147,38 @@ impl Allocator {
 
 fn store_single_value<T>(value: T) -> NonNull<GcBox<T>> {
     let storage = Box::new(GcBox::new(value));
+    // Unsafe is for the call to `NonNull::new_unchecked`.
+    // The call can't fail since `Box::leak` returns a reference, which must
+    // be a valid, nonnull pointer.
     unsafe { NonNull::new_unchecked(Box::leak(storage)) }
 }
 
-fn get_rebox<T>() -> fn(NonNull<UntypedGcBox>) {
-    |ptr: NonNull<UntypedGcBox>| unsafe {
-        // Should be safe to cast to mut, as this is only used for destruction.
-        // There shouldn't be any other active pointers to the object.
+fn get_rebox<T>() -> unsafe fn(NonNull<UntypedGcBox>) {
+    unsafe fn rebox<T>(ptr: NonNull<UntypedGcBox>) {
         Box::<GcBox<T>>::from_raw(ptr.cast::<GcBox<T>>().as_ptr());
     }
+    rebox::<T>
+
 }
 
-fn get_refs_accessor<T>() -> fn(NonNull<UntypedGcBox>) -> usize {
-    |ptr: NonNull<UntypedGcBox>| unsafe {
+fn get_refs_accessor<T>() -> unsafe fn(NonNull<UntypedGcBox>) -> usize {
+    unsafe fn refs<T>(ptr: NonNull<UntypedGcBox>) -> usize {
         let ptr = ptr.as_typed();
         let gc_box: &GcBox<T> = ptr.as_ref();
         gc_box.ref_count()
     }
+    refs::<T>
 }
 
-fn get_tracer<T: TraceTo>() -> fn(NonNull<UntypedGcBox>) -> Tracer {
-    |ptr: NonNull<UntypedGcBox>| unsafe {
+fn get_tracer<T: TraceTo>() -> unsafe fn(NonNull<UntypedGcBox>) -> Tracer {
+    unsafe fn tracer<T: TraceTo>(ptr: NonNull<UntypedGcBox>) -> Tracer {
         let mut tracer = Tracer::new();
         let ptr = ptr.as_typed();
         let gc_box: &GcBox<T> = ptr.as_ref();
         gc_box.borrow().trace_to(&mut tracer);
         tracer
     }
+    tracer::<T>
 }
 
 #[cfg(test)]
@@ -230,27 +244,6 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn returns_valid_ptrs() {
-    //     let mut alloc = Allocator::new();
-    //     let num = alloc.alloc(22);
-    //     unsafe {
-    //         let num = &mut (*num).val;
-    //         assert_eq!(*num, 22);
-    //         *num = 42;
-    //         assert_eq!(*num, 42);
-    //     }
-    // }
-    // #[test]
-    // fn doesnt_panic_when_freeing() {
-    //     let mut alloc = Allocator::new();
-    //     let num = alloc.alloc(22);
-    //     alloc.free(num);
-    //
-    //     let num = alloc.alloc(42);
-    //     let num_val = alloc._remove(num as *const _);
-    //     assert_eq!(num_val, 42);
-    // }
     #[test]
     fn runs_dtor_on_free() {
         let mut alloc = Allocator::new();

@@ -165,6 +165,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     }
 
     fn get_gc_box<'t>(this: &'t Gc<'a, T>) -> &'t GcBox<T> {
+        // This is fine because as long as there is a Gc the pointer to the data
+        // should be valid
         unsafe { this.ptr.as_ref() }
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
@@ -312,13 +314,12 @@ impl<'a, T: 'a> Weak<'a, T> {
     fn get(&self) -> Option<&T> {
         self.weak_ptr
             .get()
+            // Unsafe is fine because if the `get()` returned a `Some` the pointer
+            // is valid.
             .map(|gc_box| unsafe { (*gc_box).borrow() })
     }
     fn get_borrow(&self) -> &T {
-        self.weak_ptr
-            .get()
-            .map(|gc_box| unsafe { (*gc_box).borrow() })
-        .expect("weak pointer was already dead")
+        self.get().expect("weak pointer was already dead")
     }
 }
 
