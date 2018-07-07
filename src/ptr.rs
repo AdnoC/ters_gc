@@ -612,7 +612,7 @@ mod tests {
 
             proxy.run();
             assert_eq!(proxy.num_tracked(), 0);
-            assert!(num_safe.get().is_none());
+            assert!(Safe::get(&num_safe).is_none());
         };
 
         col.run_with_gc(body);
@@ -758,7 +758,7 @@ mod tests {
             let two = Gc::to_safe(two);
             let other_two = Gc::to_safe(other_two);
             // Clone
-            assert_eq!(1, *one.clone().get().unwrap());
+            assert_eq!(1, *Safe::get(&one).unwrap());
             // Debug
             let one_debug = format!("{:?}", one);
             assert!(one_debug.contains("Safe"));
