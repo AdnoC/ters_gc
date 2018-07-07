@@ -451,6 +451,13 @@ impl<'a, T: 'a> Drop for Safe<'a, T> {
         }
     }
 }
+impl<'a, T: 'a> Deref for Safe<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.get_borrow()
+    }
+}
 
 /// Impls that aren't part of the core functionality of the struct, but
 /// are implemented since it is a smart pointer
