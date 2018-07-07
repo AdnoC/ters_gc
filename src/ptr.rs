@@ -49,13 +49,11 @@ impl<T> GcBox<T> {
         &self.val
     }
 
-    fn tracking_ref(&self) -> TrackingRef<T> {
+    fn tracker(&self) -> LifeTracker {
         if !self.coroner.is_tracking() {
-            let self_ptr = self as *const _;
-            self.coroner.track(self_ptr);
+            self.coroner.track();
         }
-        let tracker = self.coroner.tracker();
-        TrackingRef(tracker, PhantomData)
+        self.coroner.tracker()
     }
 }
 
@@ -71,8 +69,8 @@ impl Coroner {
     fn new() -> Coroner {
         Coroner(RefCell::new(None))
     }
-    fn track<T>(&self, target: *const GcBox<T>) { // FIXME NonNull
-        *self.0.borrow_mut() = Some(LifeTracker::new(target));
+    fn track(&self) { // FIXME NonNull
+        *self.0.borrow_mut() = Some(LifeTracker::new());
     }
 
     fn is_tracking(&self) -> bool {
@@ -84,20 +82,17 @@ impl Coroner {
     }
 }
 
-struct LifeTracker(Rc<TrackingInfo>);
+struct LifeTracker(Rc<Cell<bool>>);
 impl LifeTracker {
-    fn new<T>(target: *const GcBox<T>) -> LifeTracker { // FIXME NonNull
-        LifeTracker(Rc::new(TrackingInfo {
-            alive: Cell::new(true),
-            target: target as *const _,
-        }))
+    fn new() -> LifeTracker { // FIXME NonNull
+        LifeTracker(Rc::new(Cell::new(true)))
     }
     fn is_alive(&self) -> bool {
-        self.0.alive.get()
+        self.0.get()
     }
 
     fn dead(&self) {
-        self.0.alive.set(false);
+        self.0.set(false);
     }
 }
 impl Clone for LifeTracker {
@@ -105,54 +100,58 @@ impl Clone for LifeTracker {
         LifeTracker(self.0.clone())
     }
 }
-#[derive(Clone)]
-struct TrackingInfo {
-    alive: Cell<bool>,
-    // Type erased so that variance works?
-    target: *const UntypedGcBox, // FIXME NonNull
+
+pub struct GcRef<'arena, T: 'arena> {
+    _marker: PhantomData<&'arena T>,
+    ptr: NonNull<GcBox<T>>, // TODO Make NonNull<GcBox<T>>
+}
+impl<'a, T: 'a> GcRef<'a, T> {
+    pub(crate) fn from_raw_nonnull(
+        ptr: NonNull<GcBox<T>>,
+        _marker: PhantomData<&'a T>,
+    ) -> GcRef<'a, T> {
+        GcRef {
+            _marker,
+            ptr,
+        }
+    }
+
+    unsafe fn get_gc_box<'t>(&'t self) -> &'t GcBox<T> {
+        // This is fine because as long as there is a Gc the pointer to the data
+        // should be valid
+        self.ptr.as_ref() 
+    }
 }
 
-struct TrackingRef<T>(LifeTracker, PhantomData<T>);
-impl<T> TrackingRef<T> {
-    fn is_alive(&self) -> bool {
-        self.0.is_alive()
-    }
-    fn get(&self) -> Option<*const GcBox<T>> { // FIXME NonNull
-        if self.is_alive() {
-            let target_untyped: *const UntypedGcBox = (self.0).0.target;
-            // let target_typed: *const GcBox<T> = target_untyped as *const _;
-            Some(unsafe { ::std::mem::transmute(target_untyped) }) // FIXME NonNull
-        } else {
-            None
+impl<'a, T: 'a> Clone for GcRef<'a, T> {
+    fn clone(&self) -> Self {
+        GcRef {
+            _marker: self._marker,
+            ptr: self.ptr.clone(),
         }
     }
 }
-// Not sure why derive(Clone) didn't work
-// Maybe a PhantomData thing?
-impl<T> Clone for TrackingRef<T> {
-    fn clone(&self) -> Self {
-        TrackingRef(self.0.clone(), self.1.clone())
-    }
-}
-
 // #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually? // FIXME Delete
-pub struct Gc<'arena, T: 'arena> {
-    _marker: PhantomData<&'arena T>,
-    ptr: NonNull<GcBox<T>>, // TODO Make NonNull<GcBox<T>>
+pub struct Gc<'arena, T: 'arena>{
+    _ptr: GcRef<'arena, T>
 }
 
 
 impl<'a, T: 'a> Gc<'a, T> {
+    pub(crate) fn from_raw_gcref(
+        gc_ref: GcRef<'a, T>,
+    ) -> Gc<'a, T> {
+        let gc = Gc {
+            _ptr: gc_ref,
+        };
+        Gc::get_gc_box(&gc).incr_ref();
+        gc
+    }
     pub(crate) fn from_raw_nonnull(
         ptr: NonNull<GcBox<T>>,
         _marker: PhantomData<&'a T>,
     ) -> Gc<'a, T> {
-        let gc = Gc {
-            _marker,
-            ptr,
-        };
-        Gc::get_gc_box(&gc).incr_ref();
-        gc
+        Self::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker))
     }
     pub(crate) fn from_raw(
         ptr: *mut GcBox<T>,
@@ -167,24 +166,24 @@ impl<'a, T: 'a> Gc<'a, T> {
     fn get_gc_box<'t>(this: &'t Gc<'a, T>) -> &'t GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid
-        unsafe { this.ptr.as_ref() }
+        unsafe { this._ptr.get_gc_box() }
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
     }
     pub(crate) fn box_ptr(this: &Gc<'a, T>) -> NonNull<GcBox<T>> {
-        this.ptr
+        this._ptr.ptr
     }
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {
-            _marker: PhantomData,
-            weak_ptr: Gc::get_gc_box(this).tracking_ref(),
+            life_tracker: Gc::get_gc_box(this).tracker(),
+            ptr: this._ptr.clone(),
         }
     }
     pub fn to_safe(this: Gc<'a, T>) -> Safe<'a, T> {
         Safe {
-            _gc_marker: Some(this.clone()),
-            ptr: Gc::downgrade(&this),
+            life_tracker: Gc::get_gc_box(&this).tracker(),
+            ptr: Some(this),
         }
     }
 
@@ -216,12 +215,7 @@ mod gc_impls {
 
     impl<'a, T: 'a> Clone for Gc<'a, T> {
         fn clone(&self) -> Self {
-            let gc = Gc {
-                _marker: self._marker.clone(),
-                ptr: self.ptr,
-            };
-            Gc::get_gc_box(&gc).incr_ref();
-            gc
+            Gc::from_raw_gcref(self._ptr.clone())
         }
     }
     impl<'a, T: 'a> AsRef<T> for Gc<'a, T> {
@@ -296,27 +290,31 @@ mod gc_impls {
 }
 
 pub struct Weak<'arena, T: 'arena> {
-    _marker: PhantomData<*const &'arena ()>, // TODO: Is this the right PhantomData type?
-    weak_ptr: TrackingRef<T>,
+    life_tracker: LifeTracker,
+    ptr: GcRef<'arena, T>,
 }
 
 impl<'a, T: 'a> Weak<'a, T> {
     pub fn upgrade(&self) -> Option<Gc<'a, T>> {
-        self.weak_ptr
-            .get()
-            .map(|gc_box| Gc::from_raw(gc_box as *mut _, PhantomData)) // FIXME NonNull conversion
+        if self.life_tracker.is_alive() {
+            Some(Gc::from_raw_gcref(self.ptr.clone()))
+        } else {
+            None
+        }
     }
 
     pub fn is_alive(&self) -> bool {
-        self.weak_ptr.is_alive()
+        self.life_tracker.is_alive()
     }
 
     fn get(&self) -> Option<&T> {
-        self.weak_ptr
-            .get()
-            // Unsafe is fine because if the `get()` returned a `Some` the pointer
-            // is valid.
-            .map(|gc_box| unsafe { (*gc_box).borrow() })
+        if self.life_tracker.is_alive() {
+            // Unsafe is fine because if we are alive the pointer is valid
+            let gc_ref = unsafe { self.ptr.get_gc_box() };
+            Some(gc_ref.borrow())
+        } else {
+            None
+        }
     }
     fn get_borrow(&self) -> &T {
         self.get().expect("weak pointer was already dead")
@@ -333,8 +331,8 @@ mod weak_impls {
     impl<'a, T: 'a> Clone for Weak<'a, T> {
         fn clone(&self) -> Self {
             Weak {
-                _marker: self._marker.clone(),
-                weak_ptr: self.weak_ptr.clone(),
+                life_tracker: self.life_tracker.clone(),
+                ptr: self.ptr.clone(),
             }
         }
     }
@@ -405,39 +403,49 @@ mod weak_impls {
 
 #[derive(Clone)]
 pub struct Safe<'arena, T: 'arena> {
-    _gc_marker: Option<Gc<'arena, T>>,
-    ptr: Weak<'arena, T>,
+    // ptr is `Option` so that when the pointer is no longer valid we can change
+    // it to `None` and not run the `Gc` destructor
+    ptr: Option<Gc<'arena, T>>,
+    life_tracker: LifeTracker,
 }
 impl<'a, T: 'a> Safe<'a, T> {
-    pub fn to_unsafe(mut this: Safe<'a, T>) -> Gc<'a, T> {
-        use std::mem::replace;
-        let gc = replace(&mut this._gc_marker, None);
-        gc.expect("convecsion from invalid Safe")
+    pub fn to_unsafe(mut this: Safe<'a, T>) -> Gc<'a, T> { // FIXME: should return Option<_>
+        this.ptr.take().expect("ptr was dead")
+    }
+    fn get_gc(&self) -> Option<&Gc<'a, T>> {
+        if self.is_alive() {
+            self.ptr.as_ref()
+        } else {
+            None
+        }
     }
     pub fn get(&self) -> Option<&T> {
-        self.ptr.get()
+        self.get_gc()
+            .map(|gc| {
+                // Unsafe is fine because if we are alive the pointer
+                // is valid.
+                let gc_ref = unsafe { Gc::get_gc_box(gc) };
+                gc_ref.borrow()
+            })
     }
     fn get_borrow(&self) -> &T {
         self.get().expect("safe pointer was already dead")
     }
     pub fn is_alive(&self) -> bool {
-        self.ptr.is_alive()
+        self.life_tracker.is_alive()
     }
     pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
-        if self.is_alive() {
-            self._gc_marker.as_ref().map(|gc| Gc::box_ptr(gc)) // FIXME NonNull conversion
-        } else {
-            None
-        }
+        self.get_gc()
+            .map(Gc::box_ptr)
     }
 }
 impl<'a, T: 'a> Drop for Safe<'a, T> {
     fn drop(&mut self) {
-        use std::mem::{forget, replace};
+        use std::mem::forget;
         println!("self living = {}", self.is_alive());
         if !self.is_alive() {
             println!("swapping");
-            let gc = replace(&mut self._gc_marker, None);
+            let gc = self.ptr.take();
             println!("swapped");
             forget(gc);
             println!("forget gc");
