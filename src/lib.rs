@@ -360,6 +360,28 @@ mod tests {
             callback()
         }
     }
+
+    #[test]
+    fn collect_while_in_stack_after_drop() {
+        use std::mem::drop;
+        let mut col = Collector::new();
+        col.run_with_gc(|mut proxy| {
+
+            for i in 0..60 {
+                let num = proxy.store(i);
+                assert_eq!(*num, i);
+            }
+            let num = proxy.store(-1);
+            assert_eq!(*num, -1);
+            assert!(proxy.num_tracked() > 0);
+            proxy.run();
+            assert!(proxy.num_tracked() > 0);
+            drop(num);
+            proxy.run();
+            assert_eq!(0, proxy.num_tracked());
+        });
+    }
+
     #[test]
     fn msc_allocs_sanity_check() {
         let mut col = Collector::new();
