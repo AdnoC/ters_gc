@@ -411,12 +411,8 @@ impl<'a, T: 'a> Safe<'a, T> {
     pub fn to_unsafe(mut this: Safe<'a, T>) -> Gc<'a, T> { // FIXME: should return Option<_>
         this.ptr.take().expect("ptr was dead")
     }
-    fn get_gc(&self) -> Option<&Gc<'a, T>> {
-        if Self::is_alive(self) {
-            self.ptr.as_ref()
-        } else {
-            None
-        }
+    pub fn is_alive(this: &Self) -> bool {
+        this.life_tracker.is_alive()
     }
     pub fn get(this: &Self) -> Option<&T> {
         this.get_gc()
@@ -427,11 +423,15 @@ impl<'a, T: 'a> Safe<'a, T> {
                 gc_ref.borrow()
             })
     }
+    fn get_gc(&self) -> Option<&Gc<'a, T>> {
+        if Self::is_alive(self) {
+            self.ptr.as_ref()
+        } else {
+            None
+        }
+    }
     fn get_borrow(&self) -> &T {
         Self::get(self).expect("safe pointer was already dead")
-    }
-    pub fn is_alive(this: &Self) -> bool { // FIXME Move up
-        this.life_tracker.is_alive()
     }
     pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
         self.get_gc()
