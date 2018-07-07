@@ -69,7 +69,7 @@ impl Coroner {
     fn new() -> Coroner {
         Coroner(RefCell::new(None))
     }
-    fn track(&self) { // FIXME NonNull
+    fn track(&self) {
         *self.0.borrow_mut() = Some(LifeTracker::new());
     }
 
@@ -84,7 +84,7 @@ impl Coroner {
 
 struct LifeTracker(Rc<Cell<bool>>);
 impl LifeTracker {
-    fn new() -> LifeTracker { // FIXME NonNull
+    fn new() -> LifeTracker {
         LifeTracker(Rc::new(Cell::new(true)))
     }
     fn is_alive(&self) -> bool {
@@ -131,7 +131,6 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
         }
     }
 }
-// #[derive(PartialEq, Eq, Hash)] // Debug? Should `Clone` be done manually? // FIXME Delete
 pub struct Gc<'arena, T: 'arena>{
     _ptr: GcRef<'arena, T>
 }
