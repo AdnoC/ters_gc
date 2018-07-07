@@ -1,10 +1,10 @@
 extern crate ters_gc;
 use ters_gc::{Collector, Gc};
 use std::mem::drop;
+use std::thread;
 
 fn gc_not_send() {
     Collector::new().run_with_gc(|mut proxy| {
-        use std::thread;
         let num = proxy.store(5);
         thread::spawn(move || { //~ ERROR Send` is not satisfied
                                 //~| cannot be sent between threads safely
@@ -15,7 +15,6 @@ fn gc_not_send() {
 
 fn safe_not_send() {
     Collector::new().run_with_gc(|mut proxy| {
-        use std::thread;
         let num = proxy.store(5);
         let num = Gc::to_safe(num);
         thread::spawn(move || { //~ ERROR Send` is not satisfied
@@ -28,7 +27,6 @@ fn safe_not_send() {
 
 fn weak_not_send() {
     Collector::new().run_with_gc(|mut proxy| {
-        use std::thread;
         let num = proxy.store(5);
         let num = Gc::downgrade(&num);
         thread::spawn(move || { //~ ERROR Send` is not satisfied
@@ -41,7 +39,6 @@ fn weak_not_send() {
 
 fn gc_not_sync() {
     Collector::new().run_with_gc(|mut proxy| {
-        use std::thread;
         let num = proxy.store(5);
         let num_ref = &num;
         thread::spawn(move || { //~ ERROR cannot be shared between threads safely
@@ -53,7 +50,6 @@ fn gc_not_sync() {
 
 fn safe_not_sync() {
     Collector::new().run_with_gc(|mut proxy| {
-        use std::thread;
         let num = proxy.store(5);
         let num = Gc::to_safe(num);
         let num_ref = &num;
@@ -67,7 +63,6 @@ fn safe_not_sync() {
 
 fn weak_not_sync() {
     Collector::new().run_with_gc(|mut proxy| {
-        use std::thread;
         let num = proxy.store(5);
         let num = Gc::downgrade(&num);
         let num_ref = &num;
