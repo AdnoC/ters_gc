@@ -1,4 +1,4 @@
-//! A "TinEe RuSt Garbage Collector"
+//! A **t**in**e**e **R**u**s**t **g**arbage **c**ollector
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
@@ -20,7 +20,7 @@
 //! Having said that, it should be stable enough to play around with and
 //! use for small projects.
 //!
-//! A short usage example:
+//! You can use it for cyclic data structures:
 //!
 //! ```
 //! use ters_gc::{Collector, Gc, trace};
