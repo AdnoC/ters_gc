@@ -6,14 +6,6 @@ use std::ops::Deref;
 use std::rc::Rc;
 use UntypedGcBox;
 
-/// TODO: Implement traits:
-/// Clone | s
-/// Debug | s
-/// PartialEq | s
-/// Eq | s
-/// PartialOrd | s
-/// Ord | s
-
 /// TODO: Send & Sync safety
 
 
@@ -103,7 +95,7 @@ impl Clone for LifeTracker {
 
 pub struct GcRef<'arena, T: 'arena> {
     _marker: PhantomData<&'arena T>,
-    ptr: NonNull<GcBox<T>>, // TODO Make NonNull<GcBox<T>>
+    ptr: NonNull<GcBox<T>>,
 }
 impl<'a, T: 'a> GcRef<'a, T> {
     pub(crate) fn from_raw_nonnull(
