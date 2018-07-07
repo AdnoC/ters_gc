@@ -565,6 +565,17 @@ mod tests {
     }
 
     #[test]
+    fn deref_gc_and_safe() {
+        let mut col = Collector::new();
+        col.run_with_gc(|mut proxy| {
+            let num = proxy.store(42);
+            assert_eq!(42, *num);
+            let num = Gc::to_safe(num);
+            assert_eq!(42, *num);
+        });
+    }
+
+    #[test]
     fn casting_safe_and_weak() {
         use traceable::NoTrace;
         let mut col = Collector::new();
@@ -623,6 +634,21 @@ mod tests {
         };
 
         col.run_with_gc(body);
+    }
+
+    #[test]
+    #[should_panic]
+    fn panic_when_deref_dangling_safe() {
+        let mut col = Collector::new();
+        col.run_with_gc(|mut proxy| {
+            let num = proxy.store(0);
+            Gc::get_gc_box(&num).decr_ref();
+            let num_safe = Gc::to_safe(num);
+
+            proxy.run();
+            assert_eq!(proxy.num_tracked(), 0);
+            *num_safe
+        });
     }
 
     #[test]
