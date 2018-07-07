@@ -412,14 +412,14 @@ impl<'a, T: 'a> Safe<'a, T> {
         this.ptr.take().expect("ptr was dead")
     }
     fn get_gc(&self) -> Option<&Gc<'a, T>> {
-        if self.is_alive() {
+        if Self::is_alive(self) {
             self.ptr.as_ref()
         } else {
             None
         }
     }
-    pub fn get(&self) -> Option<&T> {
-        self.get_gc()
+    pub fn get(this: &Self) -> Option<&T> {
+        this.get_gc()
             .map(|gc| {
                 // Unsafe is fine because if we are alive the pointer
                 // is valid.
@@ -428,10 +428,10 @@ impl<'a, T: 'a> Safe<'a, T> {
             })
     }
     fn get_borrow(&self) -> &T {
-        self.get().expect("safe pointer was already dead")
+        Self::get(self).expect("safe pointer was already dead")
     }
-    pub fn is_alive(&self) -> bool {
-        self.life_tracker.is_alive()
+    pub fn is_alive(this: &Self) -> bool { // FIXME Move up
+        this.life_tracker.is_alive()
     }
     pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
         self.get_gc()
@@ -441,8 +441,8 @@ impl<'a, T: 'a> Safe<'a, T> {
 impl<'a, T: 'a> Drop for Safe<'a, T> {
     fn drop(&mut self) {
         use std::mem::forget;
-        println!("self living = {}", self.is_alive());
-        if !self.is_alive() {
+        println!("self living = {}", Self::is_alive(self));
+        if !Self::is_alive(self) {
             println!("swapping");
             let gc = self.ptr.take();
             println!("swapped");
@@ -461,7 +461,7 @@ mod safe_impls {
 
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Safe<'a, T> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            match self.get() {
+            match Self::get(self) {
                 Some(value) => {
                     f.debug_struct("Safe")
                         .field("value", value)
