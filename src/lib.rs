@@ -181,8 +181,6 @@ impl Collector {
         }
     }
 
-    /// Unsafe because there is an unsafe hole in garbage collection that cannot
-    /// be fixed. Namely, you cannot store pointers to tracked objects on the heap.
     pub fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
         let proxy = self.proxy();
         func(proxy)
