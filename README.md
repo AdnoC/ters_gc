@@ -1,4 +1,6 @@
-A **t**in**e**e **R**u**s**t **g**arbage **c**ollector
+A tinee Rust garbage collector
+
+  ^   ^ ^ ^  ^       ^
 
 ("tiny" is deliberately misspelled for the sake of the acronym)
 
