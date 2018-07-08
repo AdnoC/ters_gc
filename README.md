@@ -1,6 +1,7 @@
+```
 A tinee Rust garbage collector
-
   ^   ^ ^ ^  ^       ^
+```
 
 ("tiny" is deliberately misspelled for the sake of the acronym)
 
