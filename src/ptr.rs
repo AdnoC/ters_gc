@@ -457,6 +457,8 @@ mod safe_impls {
     use super::Safe;
     use std::cmp::Ordering;
     use std::fmt;
+    use std::hash::{Hasher, Hash};
+    use std::borrow;
 
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Safe<'a, T> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -482,14 +484,40 @@ mod safe_impls {
             }
         }
     }
+
+    impl<'a, T: 'a> AsRef<T> for Safe<'a, T> {
+        fn as_ref(&self) -> &T {
+            &**self
+        }
+    }
+    impl<'a, T: 'a + fmt::Display> fmt::Display for Safe<'a, T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fmt::Display::fmt(&**self, f)
+        }
+    }
+    impl<'a, T: 'a> fmt::Pointer for Safe<'a, T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            fmt::Pointer::fmt(&(&**self as *const T), f)
+        }
+    }
+    impl<'a, T: 'a + Hash> Hash for Safe<'a, T> {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            (**self).hash(state)
+        }
+    }
+    impl<'a, T: 'a> borrow::Borrow<T> for Safe<'a, T> {
+        fn borrow(&self) -> &T {
+            &**self
+        }
+    }
     impl<'a, T: 'a + PartialEq> PartialEq for Safe<'a, T> {
         #[inline(always)]
         fn eq(&self, other: &Safe<'a, T>) -> bool {
-            *self.get_borrow() == *other.get_borrow()
+            **self == **other
         }
         #[inline(always)]
         fn ne(&self, other: &Safe<'a, T>) -> bool {
-            *self.get_borrow() != *other.get_borrow()
+            **self != **other
         }
     }
     impl<'a, T: 'a + Eq> Eq for Safe<'a, T> {}
