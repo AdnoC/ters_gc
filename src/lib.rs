@@ -309,6 +309,15 @@ impl Collector {
     fn proxy(&mut self) -> Proxy {
         Proxy { collector: self }
     }
+    fn try_remove<'a, T: 'a>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
+        use std::ptr;
+        if Gc::is_alive(&gc) && Gc::ref_count(&gc) == 1 {
+            let ptr = gc.get_nonnull_gc_box().as_untyped();
+            Ok(self.allocator.remove::<T>(ptr))
+        } else {
+            Err(gc)
+        }
+    }
 
     fn update_collection_threshold(&mut self) {
         let num_tracked = self.num_tracked();
@@ -360,6 +369,11 @@ impl<'a> Proxy<'a> {
     /// Gets the number of objects in the gc heap.
     pub fn num_tracked(&self) -> usize {
         self.collector.num_tracked()
+    }
+
+    // Tested in ptr
+    pub(crate) fn try_remove<T>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
+        self.collector.try_remove(gc)
     }
 }
 

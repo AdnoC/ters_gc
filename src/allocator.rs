@@ -113,7 +113,7 @@ impl Allocator {
     pub fn free(&mut self, ptr: NonNull<UntypedGcBox>) {
         self.items.remove(&ptr.as_ptr()); // Will be deallocated by Drop
     }
-    pub fn _remove<T>(&mut self, ptr: NonNull<UntypedGcBox>) -> T {
+    pub fn remove<T>(&mut self, ptr: NonNull<UntypedGcBox>) -> T {
         use std::mem::forget;
         let item = self.items.remove(&ptr.as_ptr());
         forget(item);

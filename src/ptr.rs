@@ -202,6 +202,9 @@ impl<'a, T: 'a> Gc<'a, T> {
             None
         }
     }
+    pub(crate) fn get_nonnull_gc_box(&self) -> NonNull<GcBox<T>> {
+        self.ptr.ptr
+    }
     fn get_gc_box(&self) -> &GcBox<T> {
         assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
@@ -242,6 +245,9 @@ impl<'a, T: 'a> Gc<'a, T> {
         } else {
             None
         }
+    }
+    pub fn try_unwrap(this: Self, proxy: &mut Proxy<'a>) -> Result<T, Self> {
+        proxy.try_remove(this)
     }
 }
 impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
@@ -822,6 +828,48 @@ mod tests {
             let num_from_w = num_w.upgrade().unwrap();
             assert_eq!(99, *num);
             assert_eq!(42, *num_from_w);
+        });
+    }
+
+    #[test]
+    fn unwrap_ok_when_lone_or_has_weak() {
+        Collector::new().run_with_gc(|mut proxy| {
+            let num = proxy.store(42);
+            let removed_num = Gc::try_unwrap(num, &mut proxy);
+            let ok_num = removed_num.unwrap();
+            assert_eq!(42, ok_num);
+        });
+
+        Collector::new().run_with_gc(|mut proxy| {
+            let num = proxy.store(42);
+            let weak_1 = Gc::downgrade(&num);
+            let weak_2 = Gc::downgrade(&num);
+            let weak_3 = Gc::downgrade(&num);
+            let weak_4 = Gc::downgrade(&num);
+            let weak_5 = Gc::downgrade(&num);
+            let removed_num = Gc::try_unwrap(num, &mut proxy);
+            let ok_num = removed_num.unwrap();
+            assert_eq!(42, ok_num);
+
+            assert!(!weak_1.is_alive());
+            assert!(!weak_2.is_alive());
+            assert!(!weak_3.is_alive());
+            assert!(!weak_4.is_alive());
+            assert!(!weak_5.is_alive());
+        });
+    }
+
+    #[test]
+    fn unwrap_err_when_multiple_refs() {
+        Collector::new().run_with_gc(|mut proxy| {
+            let num = proxy.store(42);
+            let num_cl = num.clone();
+            let err_num = Gc::try_unwrap(num, &mut proxy);
+            assert!(err_num.is_err());
+            if let Err(err_num_inner) = err_num {
+                assert_eq!(42, *err_num_inner);
+                assert!(Gc::ptr_eq(&err_num_inner, &num_cl));
+            }
         });
     }
 }
