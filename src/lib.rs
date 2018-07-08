@@ -10,6 +10,8 @@
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
 //! *TODO: Ensure Proxy is !Send*
 //!
+//! TODO: Mention that Gc is basically improved Rc
+//!
 //! A toy project implementing a mark-and-sweep garbage collecting allocator
 //! in the rust programming language.
 //! Based loosely on  <NAME>'s [`Tiny Garbage Collector`].
@@ -162,6 +164,9 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 }
 
 
+/// State container for grabage collection.
+/// Access to the api goes through [`Proxy`].
+/// [`Proxy`]: struct.Proxy.html
 pub struct Collector {
     allocator: Allocator,
     collection_threshold: usize,
@@ -301,31 +306,42 @@ impl Collector {
     }
 }
 
+/// Provides access to the collector.
+/// Allows for allocation and collection.
 pub struct Proxy<'arena> {
     collector: &'arena mut Collector,
 }
 
 impl<'a> Proxy<'a> {
+    /// Stores something in the gc heap.
+    ///
+    /// If not paused, runs the gc if the heap got too big.
     pub fn store<T: TraceTo>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
         Gc::from_raw_nonnull(ptr, PhantomData)
     }
 
+    /// Runs the gc.
     pub fn run(&mut self) {
         self.collector.run();
     }
-    pub fn mark(&mut self) {
-        self.collector.mark();
-    }
-    pub fn sweep(&mut self) {
-        self.collector.sweep();
-    }
+    /// Pauses automatic collection.
+    ///
+    /// Until [`Proxy::resume`][resume] is called, storing things in the gc
+    /// heap will not trigger collection. The only way collection with run
+    /// is if it is done manually with [`Proxy::run`][run].
     pub fn pause(&mut self) {
         self.collector.pause();
     }
+
+    /// Resume automatic collection.
+    ///
+    /// When storing something, will run collection if the gc heap is too big.
     pub fn resume(&mut self) {
         self.collector.resume();
     }
+
+    /// Gets the number of objects in the gc heap.
     pub fn num_tracked(&self) -> usize {
         self.collector.num_tracked()
     }
