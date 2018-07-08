@@ -203,39 +203,39 @@ impl Collector {
 
     fn mark(&self) {
         for info in self.allocator.items.values() {
-            self.mark_island_ptr(info.ptr);
+            self.mark_inter_connections(info.ptr);
         }
 
         let roots = self.allocator.items.values()
             .filter(|info| Self::is_object_reachable(info));
 
         for info in roots {
-            self.mark_newly_found_ptr(info.ptr);
+            self.mark_children_reachable(info.ptr);
+            info.mark_reachable();
         }
     }
 
-    fn mark_island_ptr(&self, ptr: NonNull<UntypedGcBox>) {
+    fn mark_inter_connections(&self, ptr: NonNull<UntypedGcBox>) {
         // assert!(self.allocator.is_ptr_in_range(ptr));
 
         if let Some(info) = self.allocator.info_for_ptr(ptr.as_ptr()) {
             for val in info.children() {
                 if let Some(child) = self.allocator.info_for_ptr(val.as_ptr()) {
-                    child.mark_isolated();
+                    child.mark_inter_ref();
                 }
             }
         }
     }
 
-    fn mark_newly_found_ptr(&self, ptr: NonNull<UntypedGcBox>) {
+    fn mark_children_reachable(&self, ptr: NonNull<UntypedGcBox>) {
         // assert!(self.allocator.is_ptr_in_range(ptr));
 
         if let Some(info) = self.allocator.info_for_ptr(ptr.as_ptr()) {
             for val in info.children() {
                 if let Some(child) = self.allocator.info_for_ptr(val.as_ptr()) {
                     if !child.is_marked_reachable() {
-                        child.unmark_isolated();
                         child.mark_reachable();
-                        self.mark_newly_found_ptr(val);
+                        self.mark_children_reachable(val);
                     }
                 }
             }
@@ -243,7 +243,7 @@ impl Collector {
     }
 
     fn is_object_reachable(info: &AllocInfo) -> bool {
-        let isolated_refs = info.isolated_marks();
+        let inter_refs = info.inter_marks();
         let total_refs = info.ref_count();
         // assert!(stack_refs + refs_in_gc <= total_refs,
         //         "Found more references to object than were made.
@@ -253,7 +253,7 @@ impl Collector {
         // zombie values of an address are found on the stack.
         // let heap_refs = total_refs - stack_refs - refs_in_gc;
         // If we know it is reachable or the only refs are hidden in the heap
-        total_refs > isolated_refs || info.is_marked_reachable()
+        total_refs > inter_refs || info.is_marked_reachable()
     }
 
     fn sweep(&mut self) {

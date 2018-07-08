@@ -24,7 +24,7 @@ pub(crate) struct AllocInfo {
     // unsafe is because it must be called with accompanying pointer
     rebox: unsafe fn(NonNull<UntypedGcBox>),
     reachable: Cell<bool>,    // # of marks from ptrs stored in stack (since we can't traverse heap)
-    isolated: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
+    inter_marks: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
     // unsafe is because it must be called with accompanying pointer
     refs: unsafe fn(NonNull<UntypedGcBox>) -> usize,
     // unsafe is because it must be called with accompanying pointer
@@ -37,7 +37,7 @@ impl AllocInfo {
             ptr: store_single_value(value).as_untyped(),
             rebox: get_rebox::<T>(),
             reachable: Cell::new(false),
-            isolated: Cell::new(0),
+            inter_marks: Cell::new(0),
             refs: get_refs_accessor::<T>(),
             trace: get_tracer::<T>(),
         }
@@ -46,24 +46,21 @@ impl AllocInfo {
     pub fn mark_reachable(&self) {
         self.reachable.set(true);
     }
-    pub fn mark_isolated(&self) {
-        self.isolated.set(self.isolated.get() + 1);
-    }
-    pub fn unmark_isolated(&self) {
-        self.isolated.set(self.isolated.get() - 1);
+    pub fn mark_inter_ref(&self) {
+        self.inter_marks.set(self.inter_marks.get() + 1);
     }
 
     pub fn unmark(&self) {
         self.reachable.set(false);
-        self.isolated.set(0);
+        self.inter_marks.set(0);
     }
 
     pub fn is_marked_reachable(&self) -> bool {
         self.reachable.get()
     }
 
-    pub fn isolated_marks(&self) -> usize {
-        self.isolated.get()
+    pub fn inter_marks(&self) -> usize {
+        self.inter_marks.get()
     }
 
     pub fn ref_count(&self) -> usize {
