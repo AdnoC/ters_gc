@@ -20,7 +20,8 @@ fn run_mode(mode: &'static str) {
     compiletest::run_tests(&config);
 }
 
-#[cfg_attr(feature="nightly", test)]
+#[cfg(feature="nightly")]
+#[test]
 fn compile_test() {
     run_mode("compile-fail");
     // run_mode("run-pass");
