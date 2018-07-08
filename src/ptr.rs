@@ -160,7 +160,7 @@ impl<'a, T: 'a> Gc<'a, T> {
         assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid (unless we are in the `sweep` phase, in which case
-        // this isn't called when dead)
+        // this isn't called when dead).
         unsafe { self.ptr.get_gc_box() }
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
