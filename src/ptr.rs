@@ -40,6 +40,9 @@ impl<T> GcBox<T> {
     pub fn borrow(&self) -> &T {
         &self.val
     }
+    pub fn borrow_mut(&mut self) -> &mut T {
+        &mut self.val
+    }
 
     fn tracker(&self) -> LifeTracker {
         if !self.coroner.is_tracking() {
@@ -142,7 +145,7 @@ impl<'a, T: 'a> Gc<'a, T> {
             life_tracker: unsafe{ gc_ref.get_gc_box().tracker() },
             ptr: gc_ref,
         };
-        Gc::get_gc_box(&gc).incr_ref();
+        gc.incr_ref();
         assert!(Gc::is_alive(&gc));
         gc
     }
@@ -151,6 +154,14 @@ impl<'a, T: 'a> Gc<'a, T> {
         _marker: PhantomData<&'a T>,
         ) -> Gc<'a, T> {
         Gc::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker))
+    }
+    fn incr_ref(&self) {
+        assert!(Gc::is_alive(self));
+        Gc::get_gc_box(self).incr_ref();
+    }
+    fn decr_ref(&self) {
+        assert!(Gc::is_alive(self));
+        Gc::get_gc_box(self).decr_ref();
     }
     pub fn is_alive(this: &Self) -> bool {
         this.life_tracker.is_alive()
@@ -163,12 +174,25 @@ impl<'a, T: 'a> Gc<'a, T> {
             None
         }
     }
+
+    pub fn get_mut(this: &mut Self) -> Option<&mut T> {
+        unimplemented!()
+        // TODO requires test for weak_count == 0
+        // if Self::is_alive(this) && Self::ref_count(this) == 1 {
+        //     Some(this.get_gc_box().borrow_mut())
+        // } else {
+        //     None
+        // }
+    }
     fn get_gc_box(&self) -> &GcBox<T> {
         assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid (unless we are in the `sweep` phase, in which case
         // this isn't called when dead).
         unsafe { self.ptr.get_gc_box() }
+    }
+    pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+        this.ptr.ptr == other.ptr.ptr
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
@@ -193,7 +217,7 @@ impl<'a, T: 'a> Gc<'a, T> {
 impl<'a, T: 'a> Drop for Gc<'a, T> {
     fn drop(&mut self) {
         if Self::is_alive(self) {
-            Gc::get_gc_box(self).decr_ref();
+            self.decr_ref();
         }
     }
 }
@@ -209,7 +233,7 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
         if !Self::is_alive(self) {
             panic!("gc pointer was already dead");
         }
-        Gc::get_gc_box(self).incr_ref();
+        self.incr_ref();
         Gc {
             ptr: self.ptr.clone(),
             life_tracker: self.life_tracker.clone(),
