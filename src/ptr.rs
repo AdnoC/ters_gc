@@ -800,6 +800,14 @@ mod tests {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
             use std::cmp::Ordering;
+            use std::hash::{Hash, Hasher};
+            use std::borrow::Borrow;
+            fn calculate_hash<H: Hash>(h: &H) -> u64 {
+                use std::collections::hash_map::DefaultHasher;
+                let mut s = DefaultHasher::new();
+                h.hash(&mut s);
+                s.finish()
+            }
             fn requires_eq<E: Eq>(_e: &E) {}
             let one = proxy.store(1);
             let other_one = proxy.store(1);
@@ -816,6 +824,16 @@ mod tests {
             let one_debug = format!("{:?}", one);
             assert!(one_debug.contains("Safe"));
             assert!(one_debug.contains(&format!("{:?}", 1)));
+            // AsRef
+            assert_eq!(1, *one.as_ref());
+            // Display
+            assert_eq!(format!("{}", 1), format!("{}", one));
+            // Pointer
+            assert_eq!(format!("{:p}", one), format!("{:p}", one.clone()));
+            // Hash
+            assert_eq!(calculate_hash(&1), calculate_hash(&one));
+            // Borrow
+            assert_eq!(1, *one.borrow());
             // PartialEq
             assert_eq!(one, other_one);
             assert!(one != two);
