@@ -256,7 +256,7 @@ impl Collector {
 
     fn sweep(&mut self) {
         let mut unreachable_objects = vec![];
-        for info in self.allocator.items.values_mut() {
+        for info in self.allocator.items.values() {
             if !Self::is_object_reachable(info) {
                 unreachable_objects.push(info.ptr);
             } else {
