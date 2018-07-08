@@ -9,18 +9,12 @@
 //! *TODO: Remove all stack-related mechanisms*
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
 //! *TODO: Ensure Proxy is !Send*
+//! *TODO: Document UB when deref Gc in destructor*
 //!
 //! TODO: Mention that Gc is basically improved Rc
 //!
-//! A toy project implementing a mark-and-sweep garbage collecting allocator
-//! in the rust programming language.
-//! Based loosely on  <NAME>'s [`Tiny Garbage Collector`].
-//!
-//! Use at your own risk: The author is neither experienced with writing
-//! unsafe rust nor has he studied garbage collectors.
-//!
-//! Having said that, it should be stable enough to play around with and
-//! use for small projects.
+//! A mark-and-sweep garbage collecting allocator 
+//! Based loosely on the [`Tiny Garbage Collector`](http://tinygc.sourceforge.net/).
 //!
 //! You can use it for cyclic data structures:
 //!
