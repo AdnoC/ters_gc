@@ -188,9 +188,7 @@ impl<'a, T: 'a> Clone for GcInner<'a, T> {
 }
 
 pub struct Gc<'arena, T: 'arena> {
-    // ptr is `Option` so that when the pointer is no longer valid we can change
-    // it to `None` and not run the `Gc` destructor
-    ptr: Option<GcInner<'arena, T>>,
+    ptr: GcRef<'arena, T>,
     life_tracker: LifeTracker,
 }
 impl<'a, T: 'a> Gc<'a, T> {
@@ -198,33 +196,29 @@ impl<'a, T: 'a> Gc<'a, T> {
         ptr: NonNull<GcBox<T>>,
         _marker: PhantomData<&'a T>,
         ) -> Gc<'a, T> {
-
-        let inner = GcInner::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker));
-        Gc {
-            life_tracker: GcInner::get_gc_box(&inner).tracker(),
-            ptr: Some(inner),
-        }
-    }
-    pub fn to_unsafe(mut this: Gc<'a, T>) -> GcInner<'a, T> { // FIXME: should return Option<_>
-        this.ptr.take().expect("ptr was dead")
+        let gc_ref = GcRef::from_raw_nonnull(ptr, _marker);
+        let gc = Gc {
+            life_tracker: unsafe{ gc_ref.get_gc_box().tracker() },
+            ptr: gc_ref,
+        };
+        Gc::get_gc_box(&gc).incr_ref();
+        gc
     }
     pub fn is_alive(this: &Self) -> bool {
         this.life_tracker.is_alive()
     }
     pub fn get(this: &Self) -> Option<&T> {
-        this.get_gc()
-            .map(|gc| {
-                // Unsafe is fine because if we are alive the pointer
-                // is valid.
-                let gc_ref = unsafe { GcInner::get_gc_box(gc) };
-                gc_ref.borrow()
-            })
+        if Self::is_alive(this) {
+            Some(this.get_gc_box().borrow())
+        } else {
+            None
+        }
     }
-    fn get_gc_box<'t>(this: &'t Gc<'a, T>) -> &'t GcBox<T> {
+    fn get_gc_box(&self) -> &GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid (unless we are in the `sweep` phase, in which case
         // this isn't called)
-        unsafe { this.ptr.as_ref().unwrap()._ptr.get_gc_box() }
+        unsafe { self.ptr.get_gc_box() }
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
@@ -232,34 +226,24 @@ impl<'a, T: 'a> Gc<'a, T> {
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         Weak {
             life_tracker: this.life_tracker.clone(),
-            ptr: this.ptr.as_ref().unwrap()._ptr.clone(),
-        }
-    }
-    fn get_gc(&self) -> Option<&GcInner<'a, T>> {
-        if Self::is_alive(self) {
-            self.ptr.as_ref()
-        } else {
-            None
+            ptr: this.ptr.clone(),
         }
     }
     fn get_borrow(&self) -> &T {
         Self::get(self).expect("safe pointer was already dead")
     }
     pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
-        self.get_gc()
-            .map(GcInner::box_ptr)
+        if Self::is_alive(self) {
+            Some(self.ptr.ptr)
+        } else {
+            None
+        }
     }
 }
 impl<'a, T: 'a> Drop for Gc<'a, T> {
     fn drop(&mut self) {
-        use std::mem::forget;
-        println!("self living = {}", Self::is_alive(self));
-        if !Self::is_alive(self) {
-            println!("swapping");
-            let gc = self.ptr.take();
-            println!("swapped");
-            forget(gc);
-            println!("forget gc");
+        if Self::is_alive(self) {
+            Gc::get_gc_box(self).decr_ref();
         }
     }
 }
@@ -268,6 +252,15 @@ impl<'a, T: 'a> Deref for Gc<'a, T> {
 
     fn deref(&self) -> &Self::Target {
         self.get_borrow()
+    }
+}
+impl<'a, T: 'a> Clone for Gc<'a, T> {
+    fn clone(&self) -> Self {
+        Gc::get_gc_box(self).incr_ref();
+        Gc {
+            ptr: self.ptr.clone(),
+            life_tracker: self.life_tracker.clone(),
+        }
     }
 }
 
@@ -280,14 +273,6 @@ mod gc_impls {
     use std::hash::{Hasher, Hash};
     use std::borrow;
 
-    impl<'a, T: 'a> Clone for Gc<'a, T> {
-        fn clone(&self) -> Self {
-            Gc {
-                ptr: self.ptr.clone(),
-                life_tracker: self.life_tracker.clone(),
-            }
-        }
-    }
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Gc<'a, T> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match Self::get(self) {
