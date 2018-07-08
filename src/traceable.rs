@@ -1,4 +1,4 @@
-use ptr::{Gc, GcBox, Safe, Weak};
+use ptr::{Gc, GcBox, Weak};
 use std::ptr::NonNull;
 use UntypedGcBox;
 use AsUntyped;
@@ -37,13 +37,7 @@ impl<T> TraceTo for NoTrace<T> {
     }
 }
 
-// impl<'a, T> TraceTo for Gc<'a, T> {
-//     fn trace_to(&self, tracer: &mut Tracer) {
-//         tracer.add_box(Gc::box_ptr(self));
-//     }
-// }
-
-impl<'a, T> TraceTo for Safe<'a, T> {
+impl<'a, T> TraceTo for Gc<'a, T> {
     fn trace_to(&self, tracer: &mut Tracer) {
         if let Some(box_ptr) = self.box_ptr() {
             tracer.add_box(box_ptr);
