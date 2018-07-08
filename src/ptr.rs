@@ -124,60 +124,6 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
     }
 }
 
-
-pub struct GcInner<'arena, T: 'arena>{
-    _ptr: GcRef<'arena, T>
-}
-
-impl<'a, T: 'a> GcInner<'a, T> {
-    // pub(crate) fn from_raw_nonnull(
-    //     ptr: NonNull<GcBox<T>>,
-    //     _marker: PhantomData<&'a T>,
-    //     ) -> GcInner<'a, T> {
-    //     Self::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker))
-    // }
-    // pub(crate) fn from_raw(
-    //     ptr: *mut GcBox<T>,
-    //     _marker: PhantomData<&'a T>,
-    //     ) -> GcInner<'a, T> {
-    //     Self::from_raw_nonnull(
-    //         NonNull::new(ptr).expect("created Gc from null ptr"),
-    //         _marker
-    //         )
-    // }
-
-    fn get_gc_box<'t>(this: &'t GcInner<'a, T>) -> &'t GcBox<T> {
-        // This is fine because as long as there is a Gc the pointer to the data
-        // should be valid
-        unsafe { this._ptr.get_gc_box() }
-    }
-    pub(crate) fn box_ptr(this: &GcInner<'a, T>) -> NonNull<GcBox<T>> {
-        this._ptr.ptr
-    }
-}
-impl<'a, T: 'a> Deref for GcInner<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        GcInner::get_gc_box(self).borrow()
-    }
-}
-impl<'a, T: 'a> Drop for GcInner<'a, T> {
-    fn drop(&mut self) {
-        println!("Drop gc {}", self._ptr.ptr.as_ptr() as usize);
-        GcInner::get_gc_box(self).decr_ref();
-        println!("After Drop gc");
-    }
-}
-impl<'a, T: 'a> Clone for GcInner<'a, T> {
-    fn clone(&self) -> Self {
-        GcInner::get_gc_box(self).incr_ref();
-        GcInner {
-            _ptr: self._ptr.clone(),
-        }
-    }
-}
-
 pub struct Gc<'arena, T: 'arena> {
     ptr: GcRef<'arena, T>,
     life_tracker: LifeTracker,
