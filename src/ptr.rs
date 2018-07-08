@@ -319,7 +319,7 @@ pub struct Weak<'arena, T: 'arena> {
 
 impl<'a, T: 'a> Weak<'a, T> {
     pub fn upgrade(&self) -> Option<Gc<'a, T>> {
-        if self.life_tracker.is_alive() {
+        if self.is_alive() {
             Some(Gc::from_raw_gcref(self.ptr.clone()))
         } else {
             None
@@ -331,7 +331,7 @@ impl<'a, T: 'a> Weak<'a, T> {
     }
 
     fn get(&self) -> Option<&T> {
-        if self.life_tracker.is_alive() {
+        if self.is_alive() {
             // Unsafe is fine because if we are alive the pointer is valid
             let gc_ref = unsafe { self.ptr.get_gc_box() };
             Some(gc_ref.borrow())
