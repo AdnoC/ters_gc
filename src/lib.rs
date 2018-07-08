@@ -128,9 +128,13 @@
 enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
 pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
-mod allocator;
 pub mod ptr;
+pub use ptr::Gc;
+pub mod trace {
+    pub use traceable::{TraceTo, Tracer};
+}
 mod traceable;
+mod allocator;
 
 use allocator::AllocInfo;
 use allocator::Allocator;
@@ -139,10 +143,6 @@ use std::ptr::NonNull;
 use std::marker::PhantomData;
 use traceable::TraceTo;
 
-pub use ptr::Gc;
-pub mod trace {
-    pub use traceable::{TraceTo, Tracer};
-}
 
 trait AsTyped {
     fn as_typed<T>(&self) -> NonNull<GcBox<T>>;
