@@ -5,12 +5,15 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
 use UntypedGcBox;
+use trace::TraceTo;
+use Proxy;
 
 /// TODO: Send & Sync safety
 
 
 pub(crate) struct GcBox<T> {
     refs: Cell<usize>,
+    weak: Cell<usize>,
     coroner: Coroner,
     val: T, // TODO: Why does this fail if it is first in list?
 }
@@ -20,6 +23,7 @@ impl<T> GcBox<T> {
         GcBox {
             val,
             refs: Cell::new(0),
+            weak: Cell::new(0),
             coroner: Coroner::new(),
         }
     }
@@ -34,13 +38,22 @@ impl<T> GcBox<T> {
     pub fn decr_ref(&self) {
         self.refs.set(self.refs.get() - 1);
     }
+    pub fn incr_weak(&self) {
+        self.weak.set(self.weak.get() + 1);
+    }
+    pub fn decr_weak(&self) {
+        self.weak.set(self.weak.get() - 1);
+    }
     pub fn ref_count(&self) -> usize {
         self.refs.get()
+    }
+    pub fn weak_count(&self) -> usize {
+        self.weak.get()
     }
     pub fn borrow(&self) -> &T {
         &self.val
     }
-    pub fn borrow_mut(&mut self) -> &mut T {
+    pub unsafe fn borrow_mut(&mut self) -> &mut T {
         &mut self.val
     }
 
@@ -116,6 +129,11 @@ impl<'a, T: 'a> GcRef<'a, T> {
         // should be valid
         self.ptr.as_ref() 
     }
+    unsafe fn get_gc_box_mut<'t>(&'t mut self) -> &'t mut GcBox<T> {
+        // This is fine because as long as there is a Gc the pointer to the data
+        // should be valid
+        self.ptr.as_mut() 
+    }
 }
 
 impl<'a, T: 'a> Clone for GcRef<'a, T> {
@@ -174,15 +192,15 @@ impl<'a, T: 'a> Gc<'a, T> {
             None
         }
     }
-
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
-        unimplemented!()
-        // TODO requires test for weak_count == 0
-        // if Self::is_alive(this) && Self::ref_count(this) == 1 {
-        //     Some(this.get_gc_box().borrow_mut())
-        // } else {
-        //     None
-        // }
+        if Self::is_alive(this) && Self::ref_count(this) == 1 && Self::weak_count(this) == 0 {
+            // TODO Justify unsafe due to only ptr to data
+            unsafe {
+                Some(this.get_gc_box_mut().borrow_mut())
+            }
+        } else {
+            None
+        }
     }
     fn get_gc_box(&self) -> &GcBox<T> {
         assert!(Self::is_alive(self));
@@ -191,17 +209,29 @@ impl<'a, T: 'a> Gc<'a, T> {
         // this isn't called when dead).
         unsafe { self.ptr.get_gc_box() }
     }
+    unsafe fn get_gc_box_mut(&mut self) -> &mut GcBox<T> {
+        assert!(Self::is_alive(self));
+        // This is fine because as long as there is a Gc the pointer to the data
+        // should be valid (unless we are in the `sweep` phase, in which case
+        // this isn't called when dead).
+        self.ptr.get_gc_box_mut()
+    }
     pub fn ptr_eq(this: &Self, other: &Self) -> bool {
         this.ptr.ptr == other.ptr.ptr
     }
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
     }
+    pub(crate) fn weak_count(this: &Gc<'a, T>) -> usize {
+        Gc::get_gc_box(this).weak_count()
+    }
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
-        Weak {
+        let weak = Weak {
             life_tracker: this.life_tracker.clone(),
             ptr: this.ptr.clone(),
-        }
+        };
+        weak.incr_weak();
+        weak
     }
     fn get_borrow(&self) -> &T {
         Self::get(self).expect("gc pointer was already dead")
@@ -211,6 +241,22 @@ impl<'a, T: 'a> Gc<'a, T> {
             Some(self.ptr.ptr)
         } else {
             None
+        }
+    }
+}
+impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
+    pub fn make_mut<'g>(this: &'g mut Self, proxy: &mut Proxy<'a>) -> &'g mut T {
+        if !Gc::is_alive(this) {
+            panic!("gc pointer was already dead");
+        } else {
+            // TODO Split case in 2 if I split data's destructure with GcBox's 
+            if Gc::ref_count(this) != 1 || Gc::weak_count(this) != 0 {
+                // Clone the data into a new Gc
+                *this = proxy.store((**this).clone());
+            }
+
+            // TODO Justify unsafe due to only ptr to data
+            unsafe { this.get_gc_box_mut().borrow_mut() }
         }
     }
 }
@@ -373,6 +419,39 @@ impl<'a, T: 'a> Weak<'a, T> {
     fn get_borrow(&self) -> &T {
         self.get().expect("weak pointer was already dead")
     }
+
+    fn get_gc_box(&self) -> Option<&GcBox<T>> {
+        // TODO unsafe justification
+        if self.is_alive() {
+            Some(unsafe { self.ptr.get_gc_box() })
+        } else {
+            None
+        }
+    }
+    fn incr_weak(&self) {
+        if let Some(gc_box) = self.get_gc_box() {
+            gc_box.incr_weak();
+        }
+    }
+    fn decr_weak(&self) {
+        if let Some(gc_box) = self.get_gc_box() {
+            gc_box.decr_weak();
+        }
+    }
+}
+impl<'a, T: 'a> Clone for Weak<'a, T> {
+    fn clone(&self) -> Self {
+        self.incr_weak();
+        Weak {
+            life_tracker: self.life_tracker.clone(),
+            ptr: self.ptr.clone(),
+        }
+    }
+}
+impl<'a, T: 'a> Drop for Weak<'a, T> {
+    fn drop(&mut self) {
+        self.decr_weak();
+    }
 }
 
 /// Impls that aren't part of the core functionality of the struct, but
@@ -382,14 +461,6 @@ mod weak_impls {
     use std::cmp::Ordering;
     use std::fmt;
 
-    impl<'a, T: 'a> Clone for Weak<'a, T> {
-        fn clone(&self) -> Self {
-            Weak {
-                life_tracker: self.life_tracker.clone(),
-                ptr: self.ptr.clone(),
-            }
-        }
-    }
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Weak<'a, T> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self.get() {
@@ -680,4 +751,77 @@ mod tests {
         col.run_with_gc(body);
     }
 
+    #[test]
+    fn gc_ptr_eq() {
+        Collector::new().run_with_gc(|mut proxy| {
+            let mut num = proxy.store(0);
+            let num_cl = num.clone();
+            let mut other_num = proxy.store(0);
+
+            assert!(Gc::ptr_eq(&num, &num_cl));
+            assert!(!Gc::ptr_eq(&num, &other_num));
+            assert!(!Gc::ptr_eq(&num_cl, &other_num));
+        });
+    }
+
+    #[test]
+    fn get_mut_only_when_lone_ref() {
+        use std::mem::drop;
+        Collector::new().run_with_gc(|mut proxy| {
+            let mut num = proxy.store(0);
+            assert!(Gc::get_mut(&mut num).is_some());
+
+            let num_cl = num.clone();
+            assert!(Gc::get_mut(&mut num).is_none());
+            drop(num_cl);
+            assert!(Gc::get_mut(&mut num).is_some());
+
+            let num_w = Gc::downgrade(&num);
+            assert!(Gc::get_mut(&mut num).is_none());
+            drop(num_w);
+            assert!(Gc::get_mut(&mut num).is_some());
+        });
+    }
+
+    #[test]
+    fn make_mut_when_lone() {
+        Collector::new().run_with_gc(|mut proxy| {
+            let mut num = proxy.store(0);
+            assert_eq!(0, *num);
+            {
+                let num_ref = Gc::make_mut(&mut num, &mut proxy);
+                {
+                    // Checking that the mut ref doesn't take proxy's lifetime
+                    let _ = proxy.store(0); 
+                }
+                *num_ref = 42;
+            }
+            assert_eq!(42, *num);
+        });
+    }
+
+    #[test]
+    fn make_mut_clones_when_others() {
+        use std::mem::drop;
+        Collector::new().run_with_gc(|mut proxy| {
+            let mut num = proxy.store(0);
+            let num_cl = num.clone();
+            {
+                let num_ref = Gc::make_mut(&mut num, &mut proxy);
+                *num_ref = 42;
+            }
+            assert_eq!(42, *num);
+            assert_eq!(0, *num_cl);
+            drop(num_cl);
+
+            let num_w = Gc::downgrade(&num);
+            {
+                let num_ref = Gc::make_mut(&mut num, &mut proxy);
+                *num_ref = 99;
+            }
+            let num_from_w = num_w.upgrade().unwrap();
+            assert_eq!(99, *num);
+            assert_eq!(42, *num_from_w);
+        });
+    }
 }
