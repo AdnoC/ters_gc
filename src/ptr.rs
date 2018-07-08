@@ -155,6 +155,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     pub fn is_alive(this: &Self) -> bool {
         this.life_tracker.is_alive()
     }
+    // TODO in doc, mention safe to use during Drop::drop
     pub fn get(this: &Self) -> Option<&T> {
         if Self::is_alive(this) {
             Some(this.get_gc_box().borrow())

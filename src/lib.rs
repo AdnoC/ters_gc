@@ -14,9 +14,11 @@
 //! TODO: Mention that Gc is basically improved Rc
 //!
 //! A mark-and-sweep garbage collecting allocator 
-//! Based loosely on the [`Tiny Garbage Collector`](http://tinygc.sourceforge.net/).
+//! Based loosely on the [`Tiny Garbage Collector`].
 //!
-//! You can use it for cyclic data structures:
+//! Provides the [`Gc`] type, essentially an [`Rc`] that can handle cycles.
+//!
+//! An example of use with a cyclic data structure:
 //!
 //! ```
 //! use ters_gc::{Collector, Gc, trace};
@@ -72,17 +74,14 @@
 //! a size threshold.
 //!
 //! The primary smart pointer type is [`Gc`]. It keeps the allocated memory alive
-//! and dereferences to a shared reference.
+//! and dereferences to a shared reference. Its API surface is meant to mimick
+//! that of [`Rc`].
 //!
 //! The [`Weak`] pointer, on the other hand, isn't counted during reachability
 //! analysis. You can have thousands of them, but if they are the only things
 //! referencing an object, that object will be freed next time the collector
 //! is run. It knows when the pointed-to object has been freed and will deny
 //! access after that occurs.
-//!
-//! The [`Safe`] pointer is  tracked during reachability analysis, and knows
-//! if the underlying object has been freed. Just in case something goes wrong
-//! and an object is accidentally freed.
 //!
 //! # Storing Custom Structs
 //!
@@ -94,7 +93,26 @@
 //!
 //! # Limitations
 //!
-//! * You can't leak [`Gc`]s and [`Safe`]s outside of the gc heap
+//! * You cannot dereference a [`Gc`] inside of a [`Drop::drop`] implementation
+//!
+//! Dereferencing a [`Gc`] inside of an object's destructor may result in a panic.
+//!
+//! If you mean to store a struct inside the gc heap, that struct's destructor
+//! cannot dereference any [`Gc`]s it contains. So if you never plan on storing
+//! something in the gc heap it is safe to dereference a [`Gc`] in the destructor,
+//! but **make sure** you aren't going to store it.
+//!
+//! As a general rule of thumb, if a type implements [`TraceTo`], it shouldn't
+//! dereference any [`Gc`]s in its destructor.
+//!
+//! The order objects are destroyed during collection is unspecified, so you
+//! should not rely on order to "safely" access data through [`Gc`]s.
+//!
+//! If you absolutely **must** dereference a [`Gc`] in a destructor, you have to
+//! first chech [`Gc::is_alive`], or access using [`Gc::get`] (which checks that
+//! it is alive).
+//!
+//! * You can't leak [`Gc`]s outside of the gc heap
 //!
 //! Calling [`mem::forget`] on a [`Gc`] will prevent the object it is pointing
 //! to from being reclaimed, leaking that memory.
@@ -116,10 +134,14 @@
 //! [`Weak`]: ptr/struct.Weak.html
 //! [`Safe`]: ptr/struct.Safe.html
 //! [`TraceTo`]: traceable/trait.TraceTo.html
-//! [`Proxy::run`]: http://example.com // FIXME
-//! [`mem::forget`]: http://example.com // FIXME
-//! [`Box`]: http://example.com // FIXME
-//! [`Tiny Garbage Collector`]: http://example.com // FIXME
+//! [`Proxy::run`]: struct.Proxy.html#method.run
+//! [`Gc::is_alive`]: ptr/struct.Gc.html#method.is_alive
+//! [`Gc::get`]: ptr/struct.Gc.html*method.get
+//! [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
+//! [`mem::forget`]: https://doc.rust-lang.org/std/mem/fn.forget.html
+//! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
+//! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
+//! [`Tiny Garbage Collector`]: http://tinygc.sourceforge.net/
 
 enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
 pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
@@ -159,7 +181,7 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 
 
 /// State container for grabage collection.
-/// Access to the api goes through [`Proxy`].
+/// Access to the API goes through [`Proxy`].
 /// [`Proxy`]: struct.Proxy.html
 pub struct Collector {
     allocator: Allocator,
@@ -592,7 +614,6 @@ mod tests {
                 *thing1.0.borrow_mut() = Some(thing2.clone());
             }
 
-            println!("Running gc");
             // Collect garbage
             proxy.run();
 
