@@ -273,7 +273,7 @@ impl<'a, T: 'a> Deref for Gc<'a, T> {
 
 /// Impls that aren't part of the core functionality of the struct, but
 /// are implemented since it is a smart pointer
-mod safe_impls {
+mod gc_impls {
     use super::Gc;
     use std::cmp::Ordering;
     use std::fmt;
