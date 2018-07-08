@@ -37,11 +37,11 @@ impl<T> TraceTo for NoTrace<T> {
     }
 }
 
-impl<'a, T> TraceTo for Gc<'a, T> {
-    fn trace_to(&self, tracer: &mut Tracer) {
-        tracer.add_box(Gc::box_ptr(self));
-    }
-}
+// impl<'a, T> TraceTo for Gc<'a, T> {
+//     fn trace_to(&self, tracer: &mut Tracer) {
+//         tracer.add_box(Gc::box_ptr(self));
+//     }
+// }
 
 impl<'a, T> TraceTo for Safe<'a, T> {
     fn trace_to(&self, tracer: &mut Tracer) {

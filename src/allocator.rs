@@ -82,6 +82,7 @@ impl AllocInfo {
 
 impl Drop for AllocInfo {
     fn drop(&mut self) {
+        println!("Dropping allocinfo {}", self.ptr.as_ptr() as usize);
         // This is used as the destructor for the pointer, so it should the only
         // reference to the object.
         unsafe { (self.rebox)(self.ptr) };

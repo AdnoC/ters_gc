@@ -586,6 +586,7 @@ mod tests {
                 *thing1.0.borrow_mut() = Some(thing2.clone());
             }
 
+            println!("Running gc");
             // Collect garbage
             proxy.run();
 
