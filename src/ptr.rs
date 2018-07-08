@@ -137,6 +137,7 @@ impl<'a, T: 'a> Gc<'a, T> {
             ptr: gc_ref,
         };
         Gc::get_gc_box(&gc).incr_ref();
+        assert!(Gc::is_alive(&gc));
         gc
     }
     pub(crate) fn from_raw_nonnull(
@@ -156,6 +157,7 @@ impl<'a, T: 'a> Gc<'a, T> {
         }
     }
     fn get_gc_box(&self) -> &GcBox<T> {
+        assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid (unless we are in the `sweep` phase, in which case
         // this isn't called when dead)
@@ -171,7 +173,7 @@ impl<'a, T: 'a> Gc<'a, T> {
         }
     }
     fn get_borrow(&self) -> &T {
-        Self::get(self).expect("safe pointer was already dead")
+        Self::get(self).expect("gc pointer was already dead")
     }
     pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
         if Self::is_alive(self) {
@@ -197,6 +199,9 @@ impl<'a, T: 'a> Deref for Gc<'a, T> {
 }
 impl<'a, T: 'a> Clone for Gc<'a, T> {
     fn clone(&self) -> Self {
+        if !Self::is_alive(self) {
+            panic!("gc pointer was already dead");
+        }
         Gc::get_gc_box(self).incr_ref();
         Gc {
             ptr: self.ptr.clone(),

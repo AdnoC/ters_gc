@@ -245,10 +245,8 @@ impl Collector {
     fn is_object_reachable(info: &AllocInfo) -> bool {
         let inter_refs = info.inter_marks();
         let total_refs = info.ref_count();
-        // assert!(stack_refs + refs_in_gc <= total_refs,
-        //         "Found more references to object than were made.
-        //          total: {}, stack: {}, in_gc_heap: {}, ptr: {}", total_refs, stack_refs, refs_in_gc, info.ptr as usize);
 
+        // FIXME This comment
         // Don't actually do the subtraction, since it will underflow if
         // zombie values of an address are found on the stack.
         // let heap_refs = total_refs - stack_refs - refs_in_gc;
