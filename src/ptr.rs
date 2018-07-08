@@ -187,118 +187,6 @@ impl<'a, T: 'a> Clone for GcInner<'a, T> {
     }
 }
 
-pub struct Weak<'arena, T: 'arena> {
-    life_tracker: LifeTracker,
-    ptr: GcRef<'arena, T>,
-}
-
-impl<'a, T: 'a> Weak<'a, T> {
-    pub fn upgrade(&self) -> Option<GcInner<'a, T>> {
-        if self.life_tracker.is_alive() {
-            Some(GcInner::from_raw_gcref(self.ptr.clone()))
-        } else {
-            None
-        }
-    }
-
-    pub fn is_alive(&self) -> bool {
-        self.life_tracker.is_alive()
-    }
-
-    fn get(&self) -> Option<&T> {
-        if self.life_tracker.is_alive() {
-            // Unsafe is fine because if we are alive the pointer is valid
-            let gc_ref = unsafe { self.ptr.get_gc_box() };
-            Some(gc_ref.borrow())
-        } else {
-            None
-        }
-    }
-    fn get_borrow(&self) -> &T {
-        self.get().expect("weak pointer was already dead")
-    }
-}
-
-/// Impls that aren't part of the core functionality of the struct, but
-/// are implemented since it is a smart pointer
-mod weak_impls {
-    use super::Weak;
-    use std::cmp::Ordering;
-    use std::fmt;
-
-    impl<'a, T: 'a> Clone for Weak<'a, T> {
-        fn clone(&self) -> Self {
-            Weak {
-                life_tracker: self.life_tracker.clone(),
-                ptr: self.ptr.clone(),
-            }
-        }
-    }
-    impl<'a, T: 'a + fmt::Debug> fmt::Debug for Weak<'a, T> {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            match self.get() {
-                Some(value) => {
-                    f.debug_struct("Weak")
-                        .field("value", value)
-                        .finish()
-                },
-                None => {
-                    struct DeadPlaceholder;
-
-                    impl fmt::Debug for DeadPlaceholder {
-                        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                            f.write_str("<dead>")
-                        }
-                    }
-
-                    f.debug_struct("Weak")
-                        .field("value", &DeadPlaceholder)
-                        .finish()
-                }
-            }
-        }
-    }
-    impl<'a, T: 'a + PartialEq> PartialEq for Weak<'a, T> {
-        #[inline(always)]
-        fn eq(&self, other: &Weak<'a, T>) -> bool {
-            *self.get_borrow() == *other.get_borrow()
-        }
-        #[inline(always)]
-        fn ne(&self, other: &Weak<'a, T>) -> bool {
-            *self.get_borrow() != *other.get_borrow()
-        }
-    }
-    impl<'a, T: 'a + Eq> Eq for Weak<'a, T> {}
-    impl<'a, T: 'a + PartialOrd> PartialOrd for Weak<'a, T> {
-        #[inline(always)]
-        fn partial_cmp(&self, other: &Weak<'a, T>) -> Option<Ordering> {
-            (*self.get_borrow()).partial_cmp(other.get_borrow())
-        }
-        #[inline(always)]
-        fn lt(&self, other: &Weak<'a, T>) -> bool {
-            *self.get_borrow() < *other.get_borrow()
-        }
-        #[inline(always)]
-        fn le(&self, other: &Weak<'a, T>) -> bool {
-            *self.get_borrow() <= *other.get_borrow()
-        }
-        #[inline(always)]
-        fn gt(&self, other: &Weak<'a, T>) -> bool {
-            *self.get_borrow() > *other.get_borrow()
-        }
-        #[inline(always)]
-        fn ge(&self, other: &Weak<'a, T>) -> bool {
-            *self.get_borrow() >= *other.get_borrow()
-        }
-    }
-    impl<'a, T: 'a + Ord> Ord for Weak<'a, T> {
-        #[inline]
-        fn cmp(&self, other: &Weak<'a, T>) -> Ordering {
-            (*self.get_borrow()).cmp(other.get_borrow())
-        }
-    }
-}
-
 pub struct Gc<'arena, T: 'arena> {
     // ptr is `Option` so that when the pointer is no longer valid we can change
     // it to `None` and not run the `Gc` destructor
@@ -490,6 +378,119 @@ mod safe_impls {
         }
     }
 
+}
+
+
+pub struct Weak<'arena, T: 'arena> {
+    life_tracker: LifeTracker,
+    ptr: GcRef<'arena, T>,
+}
+
+impl<'a, T: 'a> Weak<'a, T> {
+    pub fn upgrade(&self) -> Option<GcInner<'a, T>> {
+        if self.life_tracker.is_alive() {
+            Some(GcInner::from_raw_gcref(self.ptr.clone()))
+        } else {
+            None
+        }
+    }
+
+    pub fn is_alive(&self) -> bool {
+        self.life_tracker.is_alive()
+    }
+
+    fn get(&self) -> Option<&T> {
+        if self.life_tracker.is_alive() {
+            // Unsafe is fine because if we are alive the pointer is valid
+            let gc_ref = unsafe { self.ptr.get_gc_box() };
+            Some(gc_ref.borrow())
+        } else {
+            None
+        }
+    }
+    fn get_borrow(&self) -> &T {
+        self.get().expect("weak pointer was already dead")
+    }
+}
+
+/// Impls that aren't part of the core functionality of the struct, but
+/// are implemented since it is a smart pointer
+mod weak_impls {
+    use super::Weak;
+    use std::cmp::Ordering;
+    use std::fmt;
+
+    impl<'a, T: 'a> Clone for Weak<'a, T> {
+        fn clone(&self) -> Self {
+            Weak {
+                life_tracker: self.life_tracker.clone(),
+                ptr: self.ptr.clone(),
+            }
+        }
+    }
+    impl<'a, T: 'a + fmt::Debug> fmt::Debug for Weak<'a, T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self.get() {
+                Some(value) => {
+                    f.debug_struct("Weak")
+                        .field("value", value)
+                        .finish()
+                },
+                None => {
+                    struct DeadPlaceholder;
+
+                    impl fmt::Debug for DeadPlaceholder {
+                        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                            f.write_str("<dead>")
+                        }
+                    }
+
+                    f.debug_struct("Weak")
+                        .field("value", &DeadPlaceholder)
+                        .finish()
+                }
+            }
+        }
+    }
+    impl<'a, T: 'a + PartialEq> PartialEq for Weak<'a, T> {
+        #[inline(always)]
+        fn eq(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() == *other.get_borrow()
+        }
+        #[inline(always)]
+        fn ne(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() != *other.get_borrow()
+        }
+    }
+    impl<'a, T: 'a + Eq> Eq for Weak<'a, T> {}
+    impl<'a, T: 'a + PartialOrd> PartialOrd for Weak<'a, T> {
+        #[inline(always)]
+        fn partial_cmp(&self, other: &Weak<'a, T>) -> Option<Ordering> {
+            (*self.get_borrow()).partial_cmp(other.get_borrow())
+        }
+        #[inline(always)]
+        fn lt(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() < *other.get_borrow()
+        }
+        #[inline(always)]
+        fn le(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() <= *other.get_borrow()
+        }
+        #[inline(always)]
+        fn gt(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() > *other.get_borrow()
+        }
+        #[inline(always)]
+        fn ge(&self, other: &Weak<'a, T>) -> bool {
+            *self.get_borrow() >= *other.get_borrow()
+        }
+    }
+    impl<'a, T: 'a + Ord> Ord for Weak<'a, T> {
+        #[inline]
+        fn cmp(&self, other: &Weak<'a, T>) -> Ordering {
+            (*self.get_borrow()).cmp(other.get_borrow())
+        }
+    }
 }
 
 #[cfg(test)]
