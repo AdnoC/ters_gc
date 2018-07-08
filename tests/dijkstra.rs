@@ -60,7 +60,6 @@ impl<'a> Graph<'a> {
     }
 
     fn path_for(&self, src: GcNode<'a>, dest: GcNode<'a>) -> Option<SmallVec<[GcNode<'a>; 16]>> {
-        println!("path_for");
         // Want lower distance -> higher priority
         fn dist_to_priority(distance: u64) -> u64 {
             std::u64::MAX - distance
@@ -281,7 +280,6 @@ const _SAN: &str = "San Diego";
 
 #[test]
 fn dijkstra_is_cool() {
-    println!("dijkstra is super cool");
     let body = |mut proxy: Proxy| {
         let mut graph = Graph::new();
 
@@ -319,7 +317,6 @@ fn dijkstra_is_cool() {
         // v.push(ord);
         // v.push(jfk);
         // v.push(sfo);
-        // println!("v = {:?}", v);
     }
 
     fn test_first_path<'a>(graph: &Graph<'a>) {
