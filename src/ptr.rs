@@ -130,30 +130,21 @@ pub struct GcInner<'arena, T: 'arena>{
 }
 
 impl<'a, T: 'a> GcInner<'a, T> {
-    pub(crate) fn from_raw_gcref(
-        gc_ref: GcRef<'a, T>,
-        ) -> GcInner<'a, T> {
-        let gc = GcInner {
-            _ptr: gc_ref,
-        };
-        GcInner::get_gc_box(&gc).incr_ref();
-        gc
-    }
-    pub(crate) fn from_raw_nonnull(
-        ptr: NonNull<GcBox<T>>,
-        _marker: PhantomData<&'a T>,
-        ) -> GcInner<'a, T> {
-        Self::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker))
-    }
-    pub(crate) fn from_raw(
-        ptr: *mut GcBox<T>,
-        _marker: PhantomData<&'a T>,
-        ) -> GcInner<'a, T> {
-        Self::from_raw_nonnull(
-            NonNull::new(ptr).expect("created Gc from null ptr"),
-            _marker
-            )
-    }
+    // pub(crate) fn from_raw_nonnull(
+    //     ptr: NonNull<GcBox<T>>,
+    //     _marker: PhantomData<&'a T>,
+    //     ) -> GcInner<'a, T> {
+    //     Self::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker))
+    // }
+    // pub(crate) fn from_raw(
+    //     ptr: *mut GcBox<T>,
+    //     _marker: PhantomData<&'a T>,
+    //     ) -> GcInner<'a, T> {
+    //     Self::from_raw_nonnull(
+    //         NonNull::new(ptr).expect("created Gc from null ptr"),
+    //         _marker
+    //         )
+    // }
 
     fn get_gc_box<'t>(this: &'t GcInner<'a, T>) -> &'t GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
@@ -192,17 +183,21 @@ pub struct Gc<'arena, T: 'arena> {
     life_tracker: LifeTracker,
 }
 impl<'a, T: 'a> Gc<'a, T> {
-    pub(crate) fn from_raw_nonnull(
-        ptr: NonNull<GcBox<T>>,
-        _marker: PhantomData<&'a T>,
+    pub(crate) fn from_raw_gcref(
+        gc_ref: GcRef<'a, T>,
         ) -> Gc<'a, T> {
-        let gc_ref = GcRef::from_raw_nonnull(ptr, _marker);
         let gc = Gc {
             life_tracker: unsafe{ gc_ref.get_gc_box().tracker() },
             ptr: gc_ref,
         };
         Gc::get_gc_box(&gc).incr_ref();
         gc
+    }
+    pub(crate) fn from_raw_nonnull(
+        ptr: NonNull<GcBox<T>>,
+        _marker: PhantomData<&'a T>,
+        ) -> Gc<'a, T> {
+        Gc::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker))
     }
     pub fn is_alive(this: &Self) -> bool {
         this.life_tracker.is_alive()
@@ -372,9 +367,9 @@ pub struct Weak<'arena, T: 'arena> {
 }
 
 impl<'a, T: 'a> Weak<'a, T> {
-    pub fn upgrade(&self) -> Option<GcInner<'a, T>> {
+    pub fn upgrade(&self) -> Option<Gc<'a, T>> {
         if self.life_tracker.is_alive() {
-            Some(GcInner::from_raw_gcref(self.ptr.clone()))
+            Some(Gc::from_raw_gcref(self.ptr.clone()))
         } else {
             None
         }
@@ -615,11 +610,6 @@ mod tests {
             let other_one = proxy.store(1);
             let two = proxy.store(2);
             let other_two = proxy.store(2);
-
-            // let one = GcInner::to_safe(one);
-            // let other_one = GcInner::to_safe(other_one);
-            // let two = GcInner::to_safe(two);
-            // let other_two = GcInner::to_safe(other_two);
 
             // Deref
             assert_eq!(1, *one);
