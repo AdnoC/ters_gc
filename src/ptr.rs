@@ -124,6 +124,12 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
     }
 }
 
+/// A single-threaded garbage collected pointer.
+/// 'Gc' stands for 'Garbage Collected'.
+///
+/// The inherent methods of `Gc` are all associated functions, which means you
+/// have to call them as e.g. [`Gc::downgrade(&value)`][downgrade] instead of
+/// `value.downgrade()`. This avoids conflicts with the inner type `T`.
 pub struct Gc<'arena, T: 'arena> {
     ptr: GcRef<'arena, T>,
     life_tracker: LifeTracker,
