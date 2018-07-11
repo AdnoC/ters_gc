@@ -132,7 +132,7 @@ fn store_single_value<T>(value: T) -> NonNull<GcBox<T>> {
 fn get_rebox<T>() -> unsafe fn(NonNull<UntypedGcBox>) {
     /// Must be called with accompanying pointer
     unsafe fn rebox<T>(ptr: NonNull<UntypedGcBox>) {
-        Box::<GcBox<T>>::from_raw(ptr.cast::<GcBox<T>>().as_ptr());
+        Box::<GcBox<T>>::from_raw(ptr.as_typed().as_ptr());
     }
     rebox::<T>
 }
