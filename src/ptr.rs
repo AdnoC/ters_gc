@@ -319,6 +319,23 @@ impl<'a, T: 'a> Gc<'a, T> {
         self.ptr.get_gc_box_mut()
     }
 
+    /// Returns `true` if the two `Gc`s point to the same value
+    /// (not just values that compare as equal).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let nes_sales = proxy.store(61_910_000);
+    ///     let same_nes_sales = nes_sales.clone();
+    ///     let famicom_sales = proxy.store(61_910_000);
+    ///
+    ///     assert!(Gc::ptr_eq(&nes_sales, &same_nes_sales));
+    ///     assert!(!Gc::ptr_eq(&nes_sales, &famicom_sales));
+    /// });
+    /// ```
     pub fn ptr_eq(this: &Self, other: &Self) -> bool {
         this.ptr.ptr == other.ptr.ptr
     }
@@ -331,6 +348,21 @@ impl<'a, T: 'a> Gc<'a, T> {
         Gc::get_gc_box(this).weak_count()
     }
 
+    /// Creates a new [`Weak`] pointer to this value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let mariana_depth = proxy.store(10_994); // meters
+    ///
+    ///     let weak_depth = Gc::downgrade(&mariana_depth);
+    /// });
+    /// ```
+    ///
+    /// [`Weak`]: struct.Weak.html
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         let weak = Weak {
             life_tracker: this.life_tracker.clone(),
@@ -352,6 +384,38 @@ impl<'a, T: 'a> Gc<'a, T> {
         }
     }
 
+    /// Returns the contained value, if the `Gc` is alive and has exactly one
+    /// strong reference.
+    ///
+    /// Otherwise, an [`Err`] is returned with the same `Gc` that was passed in.
+    ///
+    /// This will succeed even if there are outstanding weak references.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    /// use std::mem::drop;
+    ///
+    /// let mut col = Collector::new();
+    /// let zambia_gdp = col.run_with_gc(|mut proxy| {
+    ///
+    ///     let zambia_2016_gdp = proxy.store(19_550_000_000); // USD
+    ///
+    ///     let gdp_clone = zambia_2016_gdp.clone();
+    ///
+    ///     let gdp_gc_again = Gc::try_unwrap(zambia_2016_gdp, &mut proxy)
+    ///         .unwrap_err();
+    ///
+    ///     drop(gdp_clone);
+    ///
+    ///     Gc::try_unwrap(gdp_gc_again, &mut proxy).unwrap()
+    /// });
+    ///
+    /// assert_eq!(zambia_gdp, 19_550_000_000);
+    /// ```
+    ///
+    /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html
     pub fn try_unwrap(this: Self, proxy: &mut Proxy<'a>) -> Result<T, Self> {
         proxy.try_remove(this)
     }
