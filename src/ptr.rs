@@ -728,7 +728,7 @@ mod gc_impls {
 ///
 /// Unlike an [`rc::Weak`] pointer, `Weak` pointers can be successfully
 /// [`upgrade`]d even when there are no longer and strong [`Gc`] pointers.
-/// A `Weak` pointer will remain alive even without any [`Gc`] pointers 
+/// A `Weak` pointer will remain alive even without any [`Gc`] pointers
 /// until garbage collection is run and the inner object is reclaimed.
 ///
 /// The typical way to obtain a `Weak` pointer is to call [`Gc::downgrade`].
