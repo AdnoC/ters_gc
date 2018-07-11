@@ -149,8 +149,16 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// have to call them as e.g. [`Gc::downgrade(&value)`][downgrade] instead of
 /// `value.downgrade()`. This avoids conflicts with the inner type `T`.
 ///
+/// Dereferencing a `Gc` inside a destructor (impl of [`Drop::drop`]) can lead
+/// to undefined behavior. If you must do so, either check that the `Gc` is still
+/// alive with [`Gc::is_alive`][is_alive] first, or use dereference it using
+/// [`Gc::get`][get].
+///
+/// [get]: #method.get
+/// [is_alive]: #method.is_alive
 /// [downgrade]: #method.downgrade
 /// [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
+/// [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
 pub struct Gc<'arena, T: 'arena> {
     ptr: GcRef<'arena, T>,
     life_tracker: LifeTracker,
@@ -183,6 +191,23 @@ impl<'a, T: 'a> Gc<'a, T> {
         Gc::get_gc_box(self).decr_ref();
     }
 
+    /// Whether or not the object pointed to by this `Gc` is still valid and has
+    /// not been freed.
+    ///
+    /// Allows you to check in destructors that the data a `Gc` point to has
+    /// not already been reclaimed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let meaning_of_life = proxy.store(42);
+    ///
+    ///     assert!(Gc::is_alive(&meaning_of_life));
+    /// });
+    /// ```
     pub fn is_alive(this: &Self) -> bool {
         this.life_tracker.is_alive()
     }
