@@ -1,3 +1,14 @@
+//! Garbage collected pointers.
+//!
+//! The type [`Gc<'a, T>`][`Gc`] provides shared ownership of a value of type `T`
+//! allocated in the gc heap. Invoking [`clone`] on [`Gc`] produces a new pointer
+//! to the same value in the heap. When no [`Gc`] pointers are reachable from
+//! outside the gc heap, the pointed-to value will be destroyed when collection
+//! is run.
+//!
+//! [`Gc`]: struct.Gc.html
+//! [`clone`]: https://doc.rust-lang.org/std/clone/trait.Clone.html#tymethod.clone
+
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::marker::PhantomData;
@@ -145,24 +156,52 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 ///
 /// The API is meant to mirror that of [`Rc`].
 ///
+/// The type [`Gc<'a, T>`][`Gc`] provides shared ownership of a value of type `T`
+/// allocated in the gc heap. Invoking [`clone`] on [`Gc`] produces a new pointer
+/// to the same value in the heap. When no [`Gc`] pointers are reachable from
+/// outside the gc heap, the pointed-to value will be destroyed when collection
+/// is run.
+///
 /// The inherent methods of `Gc` are all associated functions, which means you
 /// have to call them as e.g. [`Gc::downgrade(&value)`][downgrade] instead of
 /// `value.downgrade()`. This avoids conflicts with the inner type `T`.
 ///
-/// Dereferencing a `Gc` inside a destructor (impl of [`Drop::drop`]) can lead
+/// Dereferencing a `Gc` inside a destructor ([`drop`]) can lead
 /// to undefined behavior. If you must do so, either check that the `Gc` is still
 /// alive with [`Gc::is_alive`][is_alive] first, or use dereference it using
 /// [`Gc::get`][get]. Unless otherwise mentioned, using most methods inside a destructor
 /// can result in undefined behavior.
 ///
+/// [`Gc`] does not generally allow access to mutable references to the inner value.
+/// Put a [`Cell`] or [`RefCell`] inside the [`Gc`] if you need mutability.
+///
+/// A cycle between [`Gc`] pointers will not leak memory. Once all the objects
+/// in the cycle are unreachable they will be reclaimed the next time the
+/// collector is run.
+///
 /// The typical way of obtaining a `Gc` pointer is to call [`Proxy::store`].
+///
+/// # Examples
+///
+/// Creating a [`Gc`]:
+///
+/// ```
+/// use ters_gc::Collector;
+///
+/// Collector::new().run_with_gc(|mut proxy| {
+///     let _gc_ptr = proxy.store(0);
+/// });
+/// ```
 ///
 /// [`Proxy::store`]: ../struct.Proxy.html#method.store
 /// [get]: #method.get
 /// [is_alive]: #method.is_alive
 /// [downgrade]: #method.downgrade
 /// [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
-/// [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
+/// [`drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
+/// [`clone`]: https://doc.rust-lang.org/std/clone/trait.Clone.html#tymethod.clone
+/// [`Cell`]: https://doc.rust-lang.org/std/cell/struct.Cell.html
+/// [`RefCell`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html
 // TODO Mention reference counts?
 pub struct Gc<'arena, T: 'arena> {
     ptr: GcRef<'arena, T>,
