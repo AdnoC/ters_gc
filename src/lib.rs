@@ -431,6 +431,17 @@ impl<'a> Proxy<'a> {
     /// Until [`Proxy::resume`][resume] is called, storing things in the gc
     /// heap will not trigger collection. The only way collection with run
     /// is if it is done manually with [`Proxy::run`][run].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     proxy.pause();
+    ///     assert!(proxy.paused());
+    /// });
+    /// ```
     pub fn pause(&mut self) {
         self.collector.pause();
     }
@@ -453,11 +464,41 @@ impl<'a> Proxy<'a> {
     /// Resume automatic collection.
     ///
     /// When storing something, will run collection if the gc heap is too big.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     proxy.pause();
+    ///     assert!(proxy.paused());
+    ///
+    ///     proxy.resume();
+    ///     assert!(!proxy.paused());
+    /// });
+    /// ```
     pub fn resume(&mut self) {
         self.collector.resume();
     }
 
     /// Gets the number of objects in the gc heap.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     assert_eq!(proxy.num_tracked(), 0);
+    ///
+    ///     let _ = proxy.store(());
+    ///     assert_eq!(proxy.num_tracked(), 1);
+    ///
+    ///     let _ = proxy.store(());
+    ///     assert_eq!(proxy.num_tracked(), 2);
+    /// });
+    /// ```
     pub fn num_tracked(&self) -> usize {
         self.collector.num_tracked()
     }
