@@ -393,15 +393,6 @@ mod tests {
     fn num_tracked_objs(proxy: &Proxy) -> usize {
         proxy.num_tracked()
     }
-    #[inline(never)]
-    fn eat_stack_and_exec<T, F: FnOnce() -> T>(recurs: usize, callback: F) -> T {
-        let _nom = [22; 25];
-        if recurs > 0 {
-            eat_stack_and_exec(recurs - 1, callback)
-        } else {
-            callback()
-        }
-    }
 
     #[test]
     fn collect_while_in_stack_after_drop() {
@@ -428,12 +419,12 @@ mod tests {
     fn msc_allocs_sanity_check() {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
-            eat_stack_and_exec(6, || {
+            {
                 let _num1 = proxy.store(42);
                 assert_eq!(num_tracked_objs(&proxy), 1);
                 proxy.run();
                 assert_eq!(num_tracked_objs(&proxy), 1);
-            });
+            }
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 0);
         };
@@ -459,11 +450,11 @@ mod tests {
             for _ in 0..num_useful {
                 head = prepend_ll!(); //(&mut proxy, head);
             }
-            eat_stack_and_exec(10, || {
+            {
                 for _ in 0..num_wasted {
                     proxy.store(22);
                 }
-            });
+            }
             assert_eq!(num_tracked_objs(&proxy), threshold);
             head = prepend_ll!(); //(&mut proxy, head);
             assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
@@ -491,11 +482,11 @@ mod tests {
             for _ in 0..num_useful {
                 head = prepend_ll!(); //(&mut proxy, head);
             }
-            eat_stack_and_exec(10, || {
+            {
                 for _ in 0..num_wasted {
                     proxy.store(22);
                 }
-            });
+            }
             assert_eq!(num_tracked_objs(&proxy), threshold);
             proxy.pause();
             prepend_ll!(); //(&mut proxy, head);
@@ -523,11 +514,11 @@ mod tests {
             for _ in 0..num_useful {
                 head = prepend_ll!(); //(&mut proxy, head);
             }
-            eat_stack_and_exec(10, || {
+            {
                 for _ in 0..num_wasted {
                     proxy.store(22);
                 }
-            });
+            }
             assert_eq!(num_tracked_objs(&proxy), threshold);
             proxy.pause();
             proxy.resume();
@@ -557,14 +548,14 @@ mod tests {
         }
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
-            eat_stack_and_exec(6, || {
+            {
                 let ptr = proxy.store(SelfRef {
                     self_ptr: RefCell::new(None),
                 });
                 *ptr.self_ptr.borrow_mut() = Some(ptr.clone());
 
                 proxy.run();
-            });
+            }
 
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 0);
@@ -585,11 +576,11 @@ mod tests {
         }
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
-            let _root = eat_stack_and_exec(6, || {
+            let _root = {
                 let leaf = proxy.store(List { ptr: None });
                 let root = proxy.store(List { ptr: Some(leaf) });
                 Box::new(root)
-            });
+            };
 
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 2);

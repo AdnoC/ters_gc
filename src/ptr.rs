@@ -538,15 +538,6 @@ mod tests {
     use Collector;
     use Proxy;
 
-    #[inline(never)]
-    fn eat_stack_and_exec<T, F: FnOnce() -> T>(recurs: usize, callback: F) -> T {
-        let _nom = [22; 25];
-        if recurs > 0 {
-            eat_stack_and_exec(recurs - 1, callback)
-        } else {
-            callback()
-        }
-    }
     #[test]
     fn ref_count_works() {
         use std::mem::drop;
@@ -587,11 +578,11 @@ mod tests {
     fn weak_knows_when_dangling() {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
-            let num_weak = eat_stack_and_exec(10, || {
+            let num_weak = {
                 let num = proxy.store(0);
                 let num_weak = Gc::downgrade(&num);
                 num_weak
-            });
+            };
             proxy.run();
             assert_eq!(proxy.num_tracked(), 0);
             assert!(!num_weak.is_alive());
@@ -604,11 +595,11 @@ mod tests {
     fn gc_knows_when_dangling() {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
-            let num_safe = eat_stack_and_exec(10, || {
+            let num_safe = {
                 let num = proxy.store(0);
                 Gc::get_gc_box(&num).decr_ref();
                 num
-            });
+            };
 
             proxy.run();
             assert_eq!(proxy.num_tracked(), 0);
