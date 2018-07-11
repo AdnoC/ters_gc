@@ -394,13 +394,35 @@ impl<'a> Proxy<'a> {
     ///
     /// # Examples
     ///
+    /// ```
+    /// use ters_gc::Collector;
     ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let val = proxy.store(42);
+    ///     assert_eq!(*val, 42);
+    /// });
+    /// ```
     pub fn store<T: TraceTo>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
         Gc::from_raw_nonnull(ptr, PhantomData)
     }
 
     /// Runs the gc.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     {
+    ///         proxy.store(42);
+    ///     }
+    ///     assert_eq!(proxy.num_tracked(), 1);
+    ///     proxy.run();
+    ///     assert_eq!(proxy.num_tracked(), 0);
+    /// });
+    /// ```
     pub fn run(&mut self) {
         self.collector.run();
     }
