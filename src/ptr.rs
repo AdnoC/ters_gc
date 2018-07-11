@@ -152,7 +152,8 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// Dereferencing a `Gc` inside a destructor (impl of [`Drop::drop`]) can lead
 /// to undefined behavior. If you must do so, either check that the `Gc` is still
 /// alive with [`Gc::is_alive`][is_alive] first, or use dereference it using
-/// [`Gc::get`][get].
+/// [`Gc::get`][get]. Unless otherwise mentioned, using most methods inside a destructor
+/// can result in undefined behavior.
 ///
 /// [get]: #method.get
 /// [is_alive]: #method.is_alive
@@ -340,11 +341,41 @@ impl<'a, T: 'a> Gc<'a, T> {
         this.ptr.ptr == other.ptr.ptr
     }
 
-    pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
+    /// Get the number of strong (`Gc`) pointers to this value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let months = proxy.store(12);
+    ///     let also_months = months.clone();
+    ///
+    ///     assert_eq!(Gc::ref_count(&months), 2);
+    /// });
+    /// ```
+    pub fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
     }
 
-    pub(crate) fn weak_count(this: &Gc<'a, T>) -> usize {
+    /// Gets the number of [`Weak`] pointers to this value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let days_in_year = proxy.store(365);
+    ///     let _weak_days = Gc::downgrade(&days_in_year);
+    ///
+    ///     assert_eq!(Gc::weak_count(&days_in_year), 1);
+    /// });
+    /// ```
+    ///
+    /// [`Weak`]: struct.Weak.html
+    pub fn weak_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).weak_count()
     }
 
@@ -484,6 +515,9 @@ impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
     }
 }
 impl<'a, T: 'a> Drop for Gc<'a, T> {
+    /// Drops the `Gc`.
+    ///
+    ///
     fn drop(&mut self) {
         if Self::is_alive(self) {
             self.decr_ref();
