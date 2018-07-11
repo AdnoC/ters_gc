@@ -143,6 +143,11 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use trace::Trace;
 
+/// Cast a type-erased NonNull pointer to its original typed type
+/// (or at least to a type that is more likely to be correct and can be
+/// dereferenced).
+///
+/// Made as a trait to add a little type safety and readability
 trait AsTyped {
     fn as_typed<T>(&self) -> NonNull<GcBox<T>>;
 }
@@ -151,6 +156,10 @@ impl AsTyped for NonNull<UntypedGcBox> {
         self.cast()
     }
 }
+/// Cast a NonNull pointer to a Gc allocation into a type-erased version
+/// for storage.
+///
+/// Made as a trait to add a little type safety and readability
 trait AsUntyped {
     fn as_untyped(&self) -> NonNull<UntypedGcBox>;
 }
