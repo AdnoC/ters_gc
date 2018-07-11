@@ -17,7 +17,6 @@ impl<T> AsConstPtr for NonNull<T> {
     }
 }
 
-// TODO: Make mark stats into Cell so that the marking functs can take &self
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
     pub ptr: NonNull<UntypedGcBox>,

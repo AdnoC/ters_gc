@@ -291,7 +291,6 @@ mod trace_impls {
             }
         }
     }
-    // TODO: Is this one a good idea?
     impl<T: Trace, E> Trace for Result<T, E> {
         /// Traces inner object if `Ok`
         fn trace(&self, tracer: &mut Tracer) {

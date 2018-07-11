@@ -13,7 +13,6 @@
 //! use ters_gc::{Collector, Gc, trace};
 //! use std::cell::RefCell;
 //!
-//!
 //! // A struct that can hold references to itself
 //! struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);
 //!
@@ -25,19 +24,17 @@
 //!     }
 //! }
 //!
-//!
 //! // Make a new collector to keep the gc state
 //! let mut col = Collector::new();
 //!
 //! // Find out the meaning of life, and allow use of the gc while doing so
 //! let meaning = col.run_with_gc(|mut proxy| {
-//!
 //!     // Do some computations that are best expressed with a cyclic data structure
 //!     {
 //!         let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
 //!         let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
 //!         *thing1.0.borrow_mut() = Some(thing2.clone());
-//!     }
+//!     } // They are out of scope and no longer reachable here
 //!
 //!     // Collect garbage
 //!     proxy.run();
@@ -66,8 +63,8 @@
 //! and dereferences to a shared reference. Its API surface is meant to mimick
 //! that of [`Rc`].
 //!
-//! The [`Weak`] pointer, on the other hand, isn't counted during reachability
-//! analysis. You can have thousands of them, but if they are the only things
+//! The [`Weak`] pointer, isn't counted during reachability analysis.
+//! You can have thousands of them, but if they are the only things
 //! referencing an object, that object will be freed next time the collector
 //! is run. It knows when the pointed-to object has been freed and will deny
 //! access after that occurs.
@@ -82,7 +79,7 @@
 //!
 //! # Limitations
 //!
-//! * You cannot dereference a [`Gc`] inside of a [`Drop::drop`] implementation
+//! ## You cannot dereference a [`Gc`] inside of a [`Drop::drop`] implementation
 //!
 //! Dereferencing a [`Gc`] inside of an object's destructor may result in a panic.
 //!
@@ -101,7 +98,7 @@
 //! first chech [`Gc::is_alive`], or access using [`Gc::get`] (which checks that
 //! it is alive).
 //!
-//! * You can't leak [`Gc`]s outside of the gc heap
+//! ## You can't leak [`Gc`]s outside of the gc heap
 //!
 //! Calling [`mem::forget`] on a [`Gc`] will prevent the object it is pointing
 //! to from being reclaimed, leaking that memory.
@@ -111,7 +108,7 @@
 //! in the heap, but that the user still has a way of reaching it (like through
 //! a [`Box`]).
 //!
-//! * The garbage collector is for single threaded use only
+//! ## The garbage collector is for single threaded use only
 //!
 //!
 //!
@@ -132,7 +129,7 @@
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 //! [`Tiny Garbage Collector`]: http://tinygc.sourceforge.net/
 
-pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
+pub(crate) enum UntypedGcBox {}
 
 pub mod ptr;
 pub use ptr::Gc;
