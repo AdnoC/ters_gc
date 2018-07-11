@@ -2,7 +2,7 @@ use ptr::GcBox;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::ptr::NonNull;
-use traceable::{TraceTo, Tracer};
+use trace::{TraceTo, Tracer};
 use UntypedGcBox;
 use {AsTyped, AsUntyped};
 
@@ -235,7 +235,7 @@ mod tests {
         }
     }
     impl TraceTo for CounterIncrementer {
-        fn trace_to(&self, _: &mut ::traceable::Tracer) {
+        fn trace_to(&self, _: &mut ::trace::Tracer) {
             // noop
         }
     }

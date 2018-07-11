@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn casting_weak() {
-        use traceable::NoTrace;
+        use trace::NoTrace;
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
             let num = proxy.store(NoTrace(Cell::new(0)));

@@ -128,7 +128,7 @@
 //! [`Gc`]: ptr/struct.Gc.html
 //! [`Weak`]: ptr/struct.Weak.html
 //! [`Safe`]: ptr/struct.Safe.html
-//! [`TraceTo`]: traceable/trait.TraceTo.html
+//! [`TraceTo`]: trace/trait.TraceTo.html
 //! [`Proxy::run`]: struct.Proxy.html#method.run
 //! [`Gc::is_alive`]: ptr/struct.Gc.html#method.is_alive
 //! [`Gc::get`]: ptr/struct.Gc.html#method.get
@@ -142,18 +142,15 @@ pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
 pub mod ptr;
 pub use ptr::Gc;
-pub mod trace {
-    pub use traceable::{TraceTo, Tracer, NoTrace};
-}
 mod allocator;
-mod traceable;
+pub mod trace;
 
 use allocator::AllocInfo;
 use allocator::Allocator;
 use ptr::GcBox;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
-use traceable::TraceTo;
+use trace::TraceTo;
 
 trait AsTyped {
     fn as_typed<T>(&self) -> NonNull<GcBox<T>>;
@@ -562,7 +559,7 @@ mod tests {
         next: Option<Gc<'a, LinkedList<'a>>>,
     }
     impl<'a> TraceTo for LinkedList<'a> {
-        fn trace_to(&self, tracer: &mut traceable::Tracer) {
+        fn trace_to(&self, tracer: &mut trace::Tracer) {
             self.next.trace_to(tracer);
         }
     }
@@ -716,7 +713,7 @@ mod tests {
             self_ptr: RefCell<Option<Gc<'a, SelfRef<'a>>>>,
         }
         impl<'a> TraceTo for SelfRef<'a> {
-            fn trace_to(&self, tracer: &mut traceable::Tracer) {
+            fn trace_to(&self, tracer: &mut trace::Tracer) {
                 self.self_ptr.trace_to(tracer);
             }
         }
@@ -744,7 +741,7 @@ mod tests {
             ptr: Option<Gc<'a, List<'a>>>,
         }
         impl<'a> TraceTo for List<'a> {
-            fn trace_to(&self, tracer: &mut traceable::Tracer) {
+            fn trace_to(&self, tracer: &mut trace::Tracer) {
                 self.ptr.trace_to(tracer);
             }
         }
