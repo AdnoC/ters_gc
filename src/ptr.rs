@@ -51,6 +51,8 @@ impl<T> GcBox<T> {
     pub fn borrow(&self) -> &T {
         &self.val
     }
+    // Unsfe due to stronger requirements than `borrow`, that it should be
+    // the only active reference.
     pub unsafe fn borrow_mut(&mut self) -> &mut T {
         &mut self.val
     }
@@ -192,7 +194,9 @@ impl<'a, T: 'a> Gc<'a, T> {
     }
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
         if Self::is_alive(this) && Self::ref_count(this) == 1 && Self::weak_count(this) == 0 {
-            // TODO Justify unsafe due to only ptr to data
+            // This `Gc` is garunteed to be the sole strong reference to the data.
+            // So, we can safely get a mut reference to the `GcBox` since there
+            // is nobody else who can who can access the data.
             unsafe {
                 Some(this.get_gc_box_mut().borrow_mut())
             }
@@ -259,7 +263,10 @@ impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
                 *this = proxy.store((**this).clone());
             }
 
-            // TODO Justify unsafe due to only ptr to data
+            // At this point this `Gc` is garunteed to be the sole strong
+            // reference to the data.
+            // So, we can safely get a mut reference to the `GcBox` since there
+            // is nobody else who can who can access the data.
             unsafe { this.get_gc_box_mut().borrow_mut() }
         }
     }
@@ -425,8 +432,8 @@ impl<'a, T: 'a> Weak<'a, T> {
     }
 
     fn get_gc_box(&self) -> Option<&GcBox<T>> {
-        // TODO unsafe justification
         if self.is_alive() {
+            // Unsfe is ok since we checked that we won't be accessing freed memory
             Some(unsafe { self.ptr.get_gc_box() })
         } else {
             None
