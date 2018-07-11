@@ -80,7 +80,7 @@
 //!
 //! # Storing Custom Structs
 //!
-//! All types stored in the gc heap must implement the [`TaceTo`] trait, which
+//! All types stored in the gc heap must implement the [`TraceTo`] trait, which
 //! tells the collector where in your struct it can find pointers to other
 //! things stored in the gc heap.
 //!
