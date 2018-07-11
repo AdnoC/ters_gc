@@ -155,6 +155,9 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// [`Gc::get`][get]. Unless otherwise mentioned, using most methods inside a destructor
 /// can result in undefined behavior.
 ///
+/// The typical way of obtaining a `Gc` pointer is to call [`Proxy::store`].
+///
+/// [`Proxy::store`]: ../struct.Proxy.html#method.store
 /// [get]: #method.get
 /// [is_alive]: #method.is_alive
 /// [downgrade]: #method.downgrade
@@ -717,6 +720,28 @@ mod gc_impls {
 
 }
 
+/// `Weak` is a version of [`Gc`] that holds a non-owning reference to the managed
+/// value. The value is accessed by calling [`upgrade`] on the `Weak` pointer,
+/// which returns an [`Option`]`<`[`Gc`]`<'a, T>>`.
+///
+/// Since a `Weak` reference does not count towards ownership, it will not prevent
+/// the inner value from being reclaimed during collection. `Weak` itself makes
+/// no guarantees about the value still being present and may return [`None`]
+/// when [`upgrade`]d.
+///
+/// Unlike an [`rc::Weak`] pointer, `Weak` pointers can be successfully
+/// [`upgrade`]d even when there are no longer and strong [`Gc`] pointers.
+/// A `Weak` pointer will remain alive even without any [`Gc`] pointers 
+/// until garbage collection is run and the inner object is reclaimed.
+///
+/// The typical way to obtain a `Weak` pointer is to call [`Gc::downgrade`].
+///
+/// [`Gc`]: struct.Gc.html
+/// [`Gc::downgrade`]: struct.Gc.html#method.downgrade
+/// [`upgrade`]: #method.upgrade
+/// [`rc::Weak`]: https://doc.rust-lang.org/std/rc/struct.Weak.html
+/// [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
+/// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
 // TODO: Note difference from Rc's Weak - Can upgrade even if strong_count == 0
 // so long as inner object wasn't reclaimed
 pub struct Weak<'arena, T: 'arena> {
@@ -725,6 +750,37 @@ pub struct Weak<'arena, T: 'arena> {
 }
 
 impl<'a, T: 'a> Weak<'a, T> {
+    /// Attempts to upgrade the `Weak` pointer to a [`Gc`], preventing the inner
+    /// value from being reclaimed if successful.
+    ///
+    /// Returns [`None`] if the inner value has been reclaimed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    /// use std::mem::drop;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let everest_height = proxy.store(8_848); // meters
+    ///
+    ///     let weak_height = Gc::downgrade(&everest_height);
+    ///
+    ///     let strong_height: Option<Gc<_>> = weak_height.upgrade();
+    ///     assert!(strong_height.is_some());
+    ///
+    ///     // Destroy all strong pointers
+    ///     drop(everest_height);
+    ///     drop(strong_height);
+    ///     // Reclaim memory
+    ///     proxy.run();
+    ///
+    ///     assert!(weak_height.upgrade().is_none());
+    /// });
+    /// ```
+    ///
+    /// [`Gc`]: struct.Gc.html
+    /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
     pub fn upgrade(&self) -> Option<Gc<'a, T>> {
         if self.is_alive() {
             Some(Gc::from_raw_gcref(self.ptr.clone()))
@@ -733,6 +789,28 @@ impl<'a, T: 'a> Weak<'a, T> {
         }
     }
 
+    /// Returns whether the inner object has been reclaimed and freed.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let hd = proxy.store(1080);
+    ///
+    ///     let weak_hd = Gc::downgrade(&hd);
+    ///
+    ///     assert!(weak_hd.is_alive());
+    ///
+    ///     // Reclaim memory
+    ///     drop(hd);
+    ///     proxy.run();
+    ///
+    ///     assert!(!weak_hd.is_alive());
+    /// });
+    /// ```
     pub fn is_alive(&self) -> bool {
         self.life_tracker.is_alive()
     }
