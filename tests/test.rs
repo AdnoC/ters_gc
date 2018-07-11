@@ -1,6 +1,7 @@
 #[cfg(feature = "nightly")]
 extern crate compiletest_rs as compiletest; // https://github.com/laumann/compiletest-rs
 
+#[allow(unused_imports)]
 use std::path::PathBuf;
 
 #[cfg(feature = "nightly")]

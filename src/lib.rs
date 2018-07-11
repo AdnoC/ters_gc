@@ -138,13 +138,12 @@
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 //! [`Tiny Garbage Collector`]: http://tinygc.sourceforge.net/
 
-enum BoxedCollector {} // TODO Make NonNull<GcBox<T>>
 pub(crate) enum UntypedGcBox {} // TODO Make NonNull<GcBox<T>>
 
 pub mod ptr;
 pub use ptr::Gc;
 pub mod trace {
-    pub use traceable::{TraceTo, Tracer};
+    pub use traceable::{TraceTo, Tracer, NoTrace};
 }
 mod allocator;
 mod traceable;
@@ -331,7 +330,6 @@ impl Collector {
         Proxy { collector: self }
     }
     fn try_remove<'a, T: 'a>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
-        use std::ptr;
         if Gc::is_alive(&gc) && Gc::ref_count(&gc) == 1 {
             let ptr = gc.get_nonnull_gc_box().as_untyped();
             Ok(self.allocator.remove::<T>(ptr))
@@ -809,7 +807,6 @@ mod tests {
     fn get_current_threshold() {
         let mut col = Collector::new();
         let threshold = col.run_with_gc(|proxy| proxy.threshold());
-        let init_thresh = threshold;
         assert_eq!(col.collection_threshold, threshold);
 
         let num_useful = 13;

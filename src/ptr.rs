@@ -6,7 +6,6 @@ use std::ptr::NonNull;
 use std::rc::Rc;
 use trace::TraceTo;
 use Proxy;
-use UntypedGcBox;
 
 pub(crate) struct GcBox<T> {
     refs: Cell<usize>,
@@ -769,9 +768,9 @@ mod tests {
     #[test]
     fn gc_ptr_eq() {
         Collector::new().run_with_gc(|mut proxy| {
-            let mut num = proxy.store(0);
+            let num = proxy.store(0);
             let num_cl = num.clone();
-            let mut other_num = proxy.store(0);
+            let other_num = proxy.store(0);
 
             assert!(Gc::ptr_eq(&num, &num_cl));
             assert!(!Gc::ptr_eq(&num, &other_num));
