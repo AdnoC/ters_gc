@@ -542,7 +542,7 @@ impl<'a, T: 'a> Drop for Gc<'a, T> {
     ///
     /// ```
     /// use ters_gc::{Collector, Gc};
-    /// use ters_gc::trace::{TraceTo, Tracer};
+    /// use ters_gc::trace::{TraceTo};
     ///
     /// struct Foo;
     ///
@@ -845,6 +845,19 @@ impl<'a, T: 'a> Weak<'a, T> {
     }
 }
 impl<'a, T: 'a> Clone for Weak<'a, T> {
+    /// Makes a clone of the `Weak` pointer that points to the same value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let weak_five = Gc::downgrade(&proxy.store(5));
+    ///
+    ///     weak_five.clone();
+    /// });
+    /// ```
     fn clone(&self) -> Self {
         self.incr_weak();
         Weak {
@@ -854,6 +867,7 @@ impl<'a, T: 'a> Clone for Weak<'a, T> {
     }
 }
 impl<'a, T: 'a> Drop for Weak<'a, T> {
+    /// Drops the `Weak` pointer.
     fn drop(&mut self) {
         self.decr_weak();
     }
