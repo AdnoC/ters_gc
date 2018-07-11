@@ -131,7 +131,7 @@
 //! [`TraceTo`]: traceable/trait.TraceTo.html
 //! [`Proxy::run`]: struct.Proxy.html#method.run
 //! [`Gc::is_alive`]: ptr/struct.Gc.html#method.is_alive
-//! [`Gc::get`]: ptr/struct.Gc.html*method.get
+//! [`Gc::get`]: ptr/struct.Gc.html#method.get
 //! [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
 //! [`mem::forget`]: https://doc.rust-lang.org/std/mem/fn.forget.html
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
@@ -177,6 +177,7 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 
 /// State container for grabage collection.
 /// Access to the API goes through [`Proxy`].
+///
 /// [`Proxy`]: struct.Proxy.html
 pub struct Collector {
     allocator: Allocator,
@@ -187,6 +188,7 @@ pub struct Collector {
 }
 
 impl Collector {
+    /// Constructs a new `Collector`
     pub fn new() -> Collector {
         Collector {
             allocator: Allocator::new(),
@@ -197,6 +199,8 @@ impl Collector {
         }
     }
 
+    /// Run the passed function, providing it access to gc operations via a
+    /// [`Proxy`](struct.Proxy.html).
     pub fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
         let proxy = self.proxy();
         func(proxy)
