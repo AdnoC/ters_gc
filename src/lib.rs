@@ -3,6 +3,7 @@
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
 //!
+//! *TODO: Finish ::trace docs*
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
 //! *TODO: Document UB when deref Gc in destructor*
 //!

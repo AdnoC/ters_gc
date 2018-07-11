@@ -1,3 +1,15 @@
+//! Types needed to allow a type to be stored in the gc heap.
+//!
+//! A type must implement [`TraceTo`] to be stored in the gc heap.
+//!
+//! [`TraceTo`] lets the collector know what tracked objects an object has
+//! references to. An incomplete [`TraceTo`] implementation will result in
+//! memory leaks.
+//!
+//! A correct [`TraceTo`] implementation calls  TODO Finish
+//!
+//! [`TraceTo`]: trait.TraceTo.html
+
 use ptr::{Gc, GcBox, Weak};
 use std::ptr::NonNull;
 use AsUntyped;
@@ -6,13 +18,20 @@ use UntypedGcBox;
 // Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`.
 // Can act funny if you have Sp<Gc<T>> where Sp is a smart pointer that
 // doesn't impl TraceTo.
+/// Trait all types that are stored in the gc heap must implement.
 pub trait TraceTo {
+    /// Trace reachability information to the tracer.
+    ///
+    /// Should be called on all types that contain a [`Gc`] pointer.
+    ///
+    /// [`Gc`]: ../ptr/struct.Gc.html
     fn trace_to(&self, _tracer: &mut Tracer) {
         // noop
     }
 }
 pub(crate) struct TraceDest(pub NonNull<UntypedGcBox>);
 
+/// Destination for trace information.
 pub struct Tracer {
     targets: Vec<TraceDest>,
 }
@@ -20,9 +39,6 @@ pub struct Tracer {
 impl Tracer {
     pub(crate) fn new() -> Tracer {
         Tracer { targets: vec![] }
-    }
-    pub fn add_target<T: TraceTo>(&mut self, target: &T) {
-        target.trace_to(self);
     }
     fn add_box<T>(&mut self, gc_box: NonNull<GcBox<T>>) {
         self.targets.push(TraceDest(gc_box.as_untyped()));
