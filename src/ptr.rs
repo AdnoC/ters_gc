@@ -535,6 +535,8 @@ impl<'a, T: 'a> Drop for Gc<'a, T> {
     /// The inner value is only `drop`ped when the object is reclaimed when
     /// the gc is run.
     ///
+    /// Safe to use in destructors.
+    ///
     /// # Examples
     ///
     /// ```
@@ -577,7 +579,32 @@ impl<'a, T: 'a> Deref for Gc<'a, T> {
         self.get_borrow()
     }
 }
+
 impl<'a, T: 'a> Clone for Gc<'a, T> {
+    /// Makes a clone of the `Gc` pointer.
+    ///
+    /// This creates another pointer to the same inner value, increasing the
+    /// strong reference count.
+    ///
+    /// Safe to use in destructors.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the inner object has already been freed ([`is_alive`] is
+    /// `false`).
+    ///
+    /// [`is_alive`]: #method.is_alive
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let five = proxy.store(5);
+    ///     five.clone();
+    /// });
+    /// ```
     fn clone(&self) -> Self {
         if !Self::is_alive(self) {
             panic!("gc pointer was already dead");
@@ -600,6 +627,9 @@ mod gc_impls {
     use std::hash::{Hash, Hasher};
 
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Gc<'a, T> {
+        /// Formats the value using the given formatter.
+        ///
+        /// Safe to use in destructors.
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match Self::get(self) {
                 Some(value) => f.debug_struct("Gc").field("value", value).finish(),
