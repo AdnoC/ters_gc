@@ -13,7 +13,7 @@ pub(crate) struct GcBox<T> {
     refs: Cell<usize>,
     weak: Cell<usize>,
     coroner: Coroner,
-    val: T, // TODO: Why does this fail if it is first in list?
+    val: T, // TODO: Why does this fail if it is first in list when `T: ?Sized`?
 }
 
 impl<T> GcBox<T> {
