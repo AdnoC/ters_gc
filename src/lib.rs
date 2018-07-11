@@ -2,12 +2,6 @@
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
-//!
-//! *TODO: CHECK THAT ALL LINKS ARE VALID*
-//! *TODO: Document UB when deref Gc in destructor*
-//!
-//! TODO: Mention that Gc is basically improved Rc
-//!
 //! A mark-and-sweep garbage collecting allocator.
 //! Based loosely on the [`Tiny Garbage Collector`].
 //!
