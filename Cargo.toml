@@ -10,7 +10,7 @@ authors = ["AdnoC <adam.r.cutler@gmail.com>"]
 # itertools = "0.7.6"
 
 [dev-dependencies]
-compiletest_rs = "*"
+# compiletest_rs = "*"
 smallvec = "0.6.2"
 priority-queue = "0.5.1"
 

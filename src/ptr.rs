@@ -18,6 +18,7 @@ use std::rc::Rc;
 use trace::Trace;
 use Proxy;
 
+/// Backing data of `Gc`s. The thing that is allocated and stores the user's value.
 pub(crate) struct GcBox<T> {
     refs: Cell<usize>,
     weak: Cell<usize>,
@@ -57,6 +58,7 @@ impl<T> GcBox<T> {
     pub fn weak_count(&self) -> usize {
         self.weak.get()
     }
+    // Should this be unsafe? Needs to not be an active mut reference when called
     pub fn borrow(&self) -> &T {
         &self.val
     }
@@ -74,6 +76,7 @@ impl<T> GcBox<T> {
     }
 }
 
+/// Reports to the LifeTracker when this is destroyed
 struct Coroner(RefCell<Option<LifeTracker>>);
 impl Drop for Coroner {
     fn drop(&mut self) {
