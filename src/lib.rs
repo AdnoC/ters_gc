@@ -724,4 +724,15 @@ mod tests {
         let after_thresh = col.run_with_gc(|proxy| proxy.threshold());
         assert_eq!(20, after_thresh);
     }
+
+    #[test]
+    fn set_sweep_factor() {
+        let mut col = Collector::new();
+        col.run_with_gc(|mut proxy| proxy.set_threshold_growth(0.1));
+        let factor1 = col.sweep_factor;
+        assert_eq!(factor1, 0.1);
+        col.run_with_gc(|mut proxy| proxy.set_threshold_growth(0.9));
+        let factor2 = col.sweep_factor;
+        assert_eq!(factor2, 0.9);
+    }
 }
