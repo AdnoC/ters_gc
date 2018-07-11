@@ -178,22 +178,32 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 /// State container for grabage collection.
 /// Access to the API goes through [`Proxy`].
 ///
+/// See [`Proxy`] for gc use details.
+///
 /// [`Proxy`]: struct.Proxy.html
 pub struct Collector {
     allocator: Allocator,
     collection_threshold: usize,
-    // load_factor: f64,
+    load_factor: f64,
     sweep_factor: f64,
     paused: bool,
 }
 
 impl Collector {
     /// Constructs a new `Collector`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// let mut col = Collector::new();
+    /// ```
     pub fn new() -> Collector {
         Collector {
             allocator: Allocator::new(),
             collection_threshold: 25,
-            // load_factor: 0.9,
+            load_factor: 0.9,
             sweep_factor: 0.5,
             paused: false,
         }
@@ -201,6 +211,18 @@ impl Collector {
 
     /// Run the passed function, providing it access to gc operations via a
     /// [`Proxy`](struct.Proxy.html).
+    ///
+    /// # Examles
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// let mut col = Collector::new();
+    ///
+    /// let val = col.run_with_gc(|_proxy| 42);
+    /// assert_eq!(val, 42);
+    /// 
+    /// ```
     pub fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
         let proxy = self.proxy();
         func(proxy)
@@ -317,6 +339,36 @@ impl Collector {
         }
     }
 
+    // Get the ideal number of tracked objects that can hold at least the current
+    // number of objects.
+    // Algorithm for ideal size from tgc
+    #[allow(dead_code)]
+    fn ideal_size(&self) -> usize {
+        // Primes taken from tgc
+        const PRIMES: [usize; 24] = [
+            0,       1,       5,       11,
+            23,      53,      101,     197,
+            389,     683,     1259,    2417,
+            4733,    9371,    18617,   37097,
+            74093,   148073,  296099,  592019,
+            1100009, 2200013, 4400021, 8800019
+        ];
+
+        let target = (self.num_tracked() + 1) as f64 / self.load_factor;
+        let target = target as usize;
+
+        let sat_prime = PRIMES.iter().find(|prime| **prime >= target);
+        if let Some(prime) = sat_prime {
+            *prime
+        } else {
+            let mut sat_size = PRIMES[PRIMES.len() - 1];
+            while sat_size < target {
+                sat_size += PRIMES[PRIMES.len() - 1];
+            }
+            sat_size
+        }
+    }
+
     fn update_collection_threshold(&mut self) {
         let num_tracked = self.num_tracked();
         let additional = (num_tracked as f64 * self.sweep_factor) as usize;
@@ -324,8 +376,8 @@ impl Collector {
     }
 
     fn should_collect(&self) -> bool {
-        let num_tracked = self.num_tracked();
-        !self.paused && num_tracked >= self.collection_threshold
+        // !self.paused && self.ideal_size() > self.collection_threshold
+        !self.paused && self.num_tracked() >= self.collection_threshold
     }
 }
 
@@ -370,8 +422,13 @@ impl<'a> Proxy<'a> {
     }
 
     /// Set how much the threshold to run the gc when storing things grows.
-    pub fn threshold_growth(&mut self, factor: f64) {
+    pub fn set_threshold_growth(&mut self, factor: f64) {
         self.collector.sweep_factor = factor;
+    }
+
+    /// Get how much the threshold to run the gc when storing things grows.
+    pub fn threshold(&self) -> usize {
+        self.collector.collection_threshold
     }
 
     // Tested in ptr
@@ -517,10 +574,8 @@ mod tests {
             for _ in 0..num_useful {
                 head = prepend_ll!(); //(&mut proxy, head);
             }
-            {
-                for _ in 0..num_wasted {
-                    proxy.store(22);
-                }
+            for _ in 0..num_wasted {
+                proxy.store(22);
             }
             assert_eq!(num_tracked_objs(&proxy), threshold);
             proxy.pause();
@@ -633,5 +688,40 @@ mod tests {
         });
 
         assert_eq!(meaning, 42);
+    }
+
+    #[test]
+    fn get_current_threshold() {
+        let mut col = Collector::new();
+        let threshold = col.run_with_gc(|proxy| proxy.threshold());
+        let init_thresh = threshold;
+        assert_eq!(col.collection_threshold, threshold);
+
+        let num_useful = 13;
+        let num_wasted = threshold - num_useful;
+        assert!(threshold > num_useful);
+
+        col.run_with_gc(|mut proxy: Proxy| {
+            let mut head = LinkedList { next: None };
+            macro_rules! prepend_ll {
+                () => {{
+                    let boxed = proxy.store(head);
+                    LinkedList { next: Some(boxed) }
+                }};
+            }
+            for _ in 0..num_useful {
+                head = prepend_ll!(); //(&mut proxy, head);
+            }
+            for _ in 0..num_wasted {
+                proxy.store(22);
+            }
+            assert_eq!(proxy.num_tracked(), threshold);
+            head = prepend_ll!(); //(&mut proxy, head);
+            assert_eq!(proxy.num_tracked(), num_useful + 1);
+            assert!(head.next.is_some());
+        });
+
+        let after_thresh = col.run_with_gc(|proxy| proxy.threshold());
+        assert_eq!(20, after_thresh);
     }
 }
