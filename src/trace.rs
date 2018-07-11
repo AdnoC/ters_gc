@@ -1,31 +1,31 @@
 //! Types needed to allow a type to be stored in the gc heap.
 //!
-//! A type must implement [`TraceTo`] to be stored in the gc heap.
+//! A type must implement [`Trace`] to be stored in the gc heap.
 //!
-//! [`TraceTo`] lets the collector know what tracked objects an object has
-//! references to. An incomplete [`TraceTo`] implementation will result in
+//! [`Trace`] lets the collector know what tracked objects an object has
+//! references to. An incomplete [`Trace`] implementation will result in
 //! memory leaks.
 //!
-//! A correct [`TraceTo`] implementation calls  TODO Finish
+//! A correct [`Trace`] implementation calls  TODO Finish
 //!
-//! [`TraceTo`]: trait.TraceTo.html
+//! [`Trace`]: trait.Trace.html
 
 use ptr::{Gc, GcBox, Weak};
 use std::ptr::NonNull;
 use AsUntyped;
 use UntypedGcBox;
 
-// Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`.
+// Impls: For every object `obj` that impls Trace, call `tracer.add_entry(&obj)`.
 // Can act funny if you have Sp<Gc<T>> where Sp is a smart pointer that
-// doesn't impl TraceTo.
+// doesn't impl Trace.
 /// Trait all types that are stored in the gc heap must implement.
-pub trait TraceTo {
+pub trait Trace {
     /// Trace reachability information to the tracer.
     ///
     /// Should be called on all types that contain a [`Gc`] pointer.
     ///
     /// [`Gc`]: ../ptr/struct.Gc.html
-    fn trace_to(&self, _tracer: &mut Tracer) {
+    fn trace(&self, _tracer: &mut Tracer) {
         // noop
     }
 }
@@ -40,6 +40,9 @@ impl Tracer {
     pub(crate) fn new() -> Tracer {
         Tracer { targets: vec![] }
     }
+    pub fn add_target<T: Trace + ?Sized>(&mut self, target: &T) {
+        target.trace(self);
+    }
     fn add_box<T>(&mut self, gc_box: NonNull<GcBox<T>>) {
         self.targets.push(TraceDest(gc_box.as_untyped()));
     }
@@ -49,21 +52,21 @@ impl Tracer {
 }
 
 
-impl<'a, T> TraceTo for Gc<'a, T> {
-    fn trace_to(&self, tracer: &mut Tracer) {
+impl<'a, T> Trace for Gc<'a, T> {
+    fn trace(&self, tracer: &mut Tracer) {
         if let Some(box_ptr) = self.box_ptr() {
             tracer.add_box(box_ptr);
         }
     }
 }
-impl<'a, T> TraceTo for Weak<'a, T> {
-    fn trace_to(&self, _: &mut Tracer) {
+impl<'a, T> Trace for Weak<'a, T> {
+    fn trace(&self, _: &mut Tracer) {
         // noop
     }
 }
 
 mod trace_impls {
-    use super::{TraceTo, Tracer};
+    use super::{Trace, Tracer};
     use std;
     use std::cmp::Eq;
     use std::cmp::Ord;
@@ -72,8 +75,8 @@ mod trace_impls {
     macro_rules! noop_impls {
         ($($T:ty)+) => {
             $(
-                impl TraceTo for $T {
-                    fn trace_to(&self, _: &mut Tracer) {
+                impl Trace for $T {
+                    fn trace(&self, _: &mut Tracer) {
                         // noop
                     }
                 }
@@ -89,10 +92,15 @@ mod trace_impls {
         f32 f64
         char str
     }
+    impl<'a> Trace for &'a str {
+        fn trace(&self, _: &mut Tracer) {
+            // noop
+        }
+    }
     macro_rules! noop_fn_impl {
         ($($T:tt)*) => {
-            impl<$($T,)* R> TraceTo for fn($($T),*) -> R {
-                fn trace_to(&self, _: &mut Tracer) {
+            impl<$($T,)* R> Trace for fn($($T),*) -> R {
+                fn trace(&self, _: &mut Tracer) {
                     // noop
                 }
             }
@@ -103,30 +111,30 @@ mod trace_impls {
     noop_fn_impl!(Q W);
     noop_fn_impl!(Q W E);
     noop_fn_impl!(Q W E T);
-    impl<T> TraceTo for *const T {
-        fn trace_to(&self, _: &mut Tracer) {
+    impl<T: ?Sized> Trace for *const T {
+        fn trace(&self, _: &mut Tracer) {
             // noop
         }
     }
-    impl<T> TraceTo for *mut T {
-        fn trace_to(&self, _: &mut Tracer) {
+    impl<T: ?Sized> Trace for *mut T {
+        fn trace(&self, _: &mut Tracer) {
             // noop
         }
     }
 
-    impl<'a, T: TraceTo> TraceTo for [T] {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<'a, T: Trace> Trace for [T] {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self.iter() {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
     macro_rules! array_impls {
         ($($N:expr)+) => {
             $(
-                impl<T: TraceTo> TraceTo for [T; $N] {
-                    fn trace_to(&self, tracer: &mut Tracer) {
-                        (&self[..]).trace_to(tracer);
+                impl<T: Trace> Trace for [T; $N] {
+                    fn trace(&self, tracer: &mut Tracer) {
+                        tracer.add_target(&self[..]);
                     }
                 }
              )+
@@ -139,97 +147,97 @@ mod trace_impls {
         30 31 32
     }
 
-    impl<T: TraceTo> TraceTo for Option<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace> Trace for Option<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             if let Some(ref contents) = self {
-                contents.trace_to(tracer);
+                tracer.add_target(contents);
             }
         }
     }
     // TODO: Is this one a good idea?
-    impl<T: TraceTo, E> TraceTo for Result<T, E> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace, E> Trace for Result<T, E> {
+        fn trace(&self, tracer: &mut Tracer) {
             if let Ok(ref contents) = self {
-                contents.trace_to(tracer);
+                tracer.add_target(contents);
             }
         }
     }
-    impl<T: TraceTo> TraceTo for Box<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace + ?Sized> Trace for Box<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             let contents: &T = &*self;
-            contents.trace_to(tracer);
+            tracer.add_target(contents);
         }
     }
-    impl<T: TraceTo> TraceTo for Vec<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace> Trace for Vec<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
-    impl<T: TraceTo> TraceTo for std::rc::Rc<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace + ?Sized> Trace for std::rc::Rc<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             let contents: &T = &*self;
-            contents.trace_to(tracer);
+            tracer.add_target(contents);
         }
     }
-    impl<T: TraceTo> TraceTo for std::sync::Arc<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace + ?Sized> Trace for std::sync::Arc<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             let contents: &T = &*self;
-            contents.trace_to(tracer);
+            tracer.add_target(contents);
         }
     }
-    impl<T: TraceTo> TraceTo for std::cell::RefCell<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
-            self.borrow().trace_to(tracer);
+    impl<T: Trace + ?Sized> Trace for std::cell::RefCell<T> {
+        fn trace(&self, tracer: &mut Tracer) {
+            tracer.add_target(&*self.borrow());
         }
     }
-    impl<T: TraceTo> TraceTo for std::collections::VecDeque<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace> Trace for std::collections::VecDeque<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
-    impl<T: TraceTo> TraceTo for std::collections::LinkedList<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace> Trace for std::collections::LinkedList<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
-    impl<T: TraceTo, K: Eq + Hash> TraceTo for std::collections::HashMap<K, T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace, K: Eq + Hash> Trace for std::collections::HashMap<K, T> {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self.values() {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
-    impl<T: TraceTo, K: Eq + Hash> TraceTo for std::collections::BTreeMap<K, T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace, K: Eq + Hash> Trace for std::collections::BTreeMap<K, T> {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self.values() {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
-    impl<T: TraceTo + Eq + Hash> TraceTo for std::collections::HashSet<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace + Eq + Hash> Trace for std::collections::HashSet<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
-    impl<T: TraceTo + Eq + Hash> TraceTo for std::collections::BTreeSet<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace + Eq + Hash> Trace for std::collections::BTreeSet<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
-    impl<T: TraceTo + Ord> TraceTo for std::collections::BinaryHeap<T> {
-        fn trace_to(&self, tracer: &mut Tracer) {
+    impl<T: Trace + Ord> Trace for std::collections::BinaryHeap<T> {
+        fn trace(&self, tracer: &mut Tracer) {
             for tracee in self {
-                tracee.trace_to(tracer);
+                tracer.add_target(tracee);
             }
         }
     }
@@ -257,8 +265,8 @@ mod tests {
             assert!(self.traced.get());
         }
     }
-    impl TraceTo for MustTrace {
-        fn trace_to(&self, _: &mut Tracer) {
+    impl Trace for MustTrace {
+        fn trace(&self, _: &mut Tracer) {
             self.traced.set(true);
         }
     }
@@ -267,13 +275,13 @@ mod tests {
     fn trace_box() {
         let mut tracer = Tracer::new();
         let tracee = Box::new(MustTrace::new());
-        tracee.trace_to(&mut tracer);
+        tracer.add_target(&tracee);
     }
     #[test]
     fn trace_vec() {
         let mut tracer = Tracer::new();
         let tracee = vec![MustTrace::new(); 25];
-        tracee.trace_to(&mut tracer);
+        tracer.add_target(&tracee);
     }
     #[test]
     fn trace_array() {
@@ -298,7 +306,7 @@ mod tests {
             nm(),
             nm(),
         ];
-        tracee.trace_to(&mut tracer);
+        tracer.add_target(&tracee);
     }
 
     #[test]
@@ -306,7 +314,7 @@ mod tests {
         let mut tracer = Tracer::new();
         let tracee = vec![MustTrace::new(); 25];
         let tra_slice: &[MustTrace] = &tracee[..];
-        tra_slice.trace_to(&mut tracer);
+        tracer.add_target(tra_slice);
     }
     #[test]
     fn trace_noops() {
@@ -318,7 +326,7 @@ mod tests {
             ($($T:ty, $val:expr)+) => {
                 $(
                     let t: $T = $val;
-                    t.trace_to(&mut tracer);
+                    tracer.add_target(&t);
                  )+
             }
         }
@@ -348,6 +356,6 @@ mod tests {
             fn(i8, u8, isize, usize) -> i8, unsafe { transmute(0 as usize) }
         );
         let t: &str = "Hello";
-        t.trace_to(&mut tracer);
+        tracer.add_target(&t);
     }
 }

@@ -9,7 +9,7 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use ters_gc::trace::{TraceTo, Tracer};
+use ters_gc::trace::{Trace, Tracer};
 use ters_gc::*;
 
 // NOTE: Might have problems with SmallVec not clearing values of `remove`d entries
@@ -157,10 +157,10 @@ impl<'a> Node<'a> {
     }
 }
 
-impl<'a> TraceTo for Node<'a> {
-    fn trace_to(&self, tracer: &mut Tracer) {
+impl<'a> Trace for Node<'a> {
+    fn trace(&self, tracer: &mut Tracer) {
         for edge in self.adjacencies.borrow().iter() {
-            edge.trace_to(tracer);
+            tracer.add_target(edge);
         }
     }
 }
@@ -206,9 +206,9 @@ struct Edge<'a> {
     dest: GcNode<'a>,
     weight: u32,
 }
-impl<'a> TraceTo for Edge<'a> {
-    fn trace_to(&self, tracer: &mut Tracer) {
-        self.dest.trace_to(tracer);
+impl<'a> Trace for Edge<'a> {
+    fn trace(&self, tracer: &mut Tracer) {
+        tracer.add_target(&self.dest);
     }
 }
 impl<'a> fmt::Debug for Edge<'a> {

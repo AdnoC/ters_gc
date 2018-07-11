@@ -2,7 +2,7 @@ use ptr::GcBox;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::ptr::NonNull;
-use trace::{TraceTo, Tracer};
+use trace::{Trace, Tracer};
 use UntypedGcBox;
 use {AsTyped, AsUntyped};
 
@@ -32,7 +32,7 @@ pub(crate) struct AllocInfo {
 }
 
 impl AllocInfo {
-    fn new<T: TraceTo>(value: T) -> AllocInfo {
+    fn new<T: Trace>(value: T) -> AllocInfo {
         AllocInfo {
             ptr: store_single_value(value).as_untyped(),
             rebox: get_rebox::<T>(),
@@ -100,7 +100,7 @@ impl Allocator {
             // min_ptr: ::std::usize::MAX,
         }
     }
-    pub fn alloc<T: TraceTo>(&mut self, value: T) -> NonNull<GcBox<T>> {
+    pub fn alloc<T: Trace>(&mut self, value: T) -> NonNull<GcBox<T>> {
         // use std::cmp::{min, max};
         let info = AllocInfo::new(value);
         // self.max_ptr = max(self.max_ptr, info.ptr as usize);
@@ -166,12 +166,12 @@ fn get_refs_accessor<T>() -> unsafe fn(NonNull<UntypedGcBox>) -> usize {
     refs::<T>
 }
 
-fn get_tracer<T: TraceTo>() -> unsafe fn(NonNull<UntypedGcBox>) -> Tracer {
-    unsafe fn tracer<T: TraceTo>(ptr: NonNull<UntypedGcBox>) -> Tracer {
+fn get_tracer<T: Trace>() -> unsafe fn(NonNull<UntypedGcBox>) -> Tracer {
+    unsafe fn tracer<T: Trace>(ptr: NonNull<UntypedGcBox>) -> Tracer {
         let mut tracer = Tracer::new();
         let ptr = ptr.as_typed();
         let gc_box: &GcBox<T> = ptr.as_ref();
-        gc_box.borrow().trace_to(&mut tracer);
+        tracer.add_target(gc_box.borrow());
         tracer
     }
     tracer::<T>
@@ -234,8 +234,8 @@ mod tests {
             counter_ref.num_run += 1;
         }
     }
-    impl TraceTo for CounterIncrementer {
-        fn trace_to(&self, _: &mut ::trace::Tracer) {
+    impl Trace for CounterIncrementer {
+        fn trace(&self, _: &mut ::trace::Tracer) {
             // noop
         }
     }

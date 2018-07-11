@@ -15,7 +15,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr::NonNull;
 use std::rc::Rc;
-use trace::TraceTo;
+use trace::Trace;
 use Proxy;
 
 pub(crate) struct GcBox<T> {
@@ -506,7 +506,7 @@ impl<'a, T: 'a> Gc<'a, T> {
         proxy.try_remove(this)
     }
 }
-impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
+impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
     /// Makes a mutable reference into the given `Gc`.
     ///
     /// If there are other `Gc` or [`Weak`] pointers to the same value,
@@ -580,7 +580,7 @@ impl<'a, T: 'a> Drop for Gc<'a, T> {
     ///
     /// ```
     /// use ters_gc::{Collector, Gc};
-    /// use ters_gc::trace::{TraceTo};
+    /// use ters_gc::trace::{Trace};
     ///
     /// struct Foo;
     ///
@@ -590,7 +590,7 @@ impl<'a, T: 'a> Drop for Gc<'a, T> {
     ///     }
     /// }
     ///
-    /// impl TraceTo for Foo { }
+    /// impl Trace for Foo { }
     ///
     /// Collector::new().run_with_gc(|mut proxy| {
     ///     let foo = proxy.store(Foo);
@@ -1003,10 +1003,10 @@ mod tests {
 
     #[test]
     fn casting_weak() {
-        use trace::TraceTo;
+        use trace::Trace;
 
         struct NoTrace<T>(pub T);
-        impl<T> TraceTo for NoTrace<T> { }
+        impl<T> Trace for NoTrace<T> { }
 
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {

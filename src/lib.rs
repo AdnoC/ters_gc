@@ -24,11 +24,11 @@
 //! // A struct that can hold references to itself
 //! struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);
 //!
-//! // All things in the gc heap need to impl `TraceTo`
-//! impl<'a> trace::TraceTo for CyclicStruct<'a> {
-//!     fn trace_to(&self, tracer: &mut trace::Tracer) {
+//! // All things in the gc heap need to impl `Trace`
+//! impl<'a> trace::Trace for CyclicStruct<'a> {
+//!     fn trace(&self, tracer: &mut trace::Tracer) {
 //!         // Tell the tracer where to find our gc pointer
-//!         self.0.trace_to(tracer);
+//!         tracer.add_target(&self.0);
 //!     }
 //! }
 //!
@@ -81,7 +81,7 @@
 //!
 //! # Storing Custom Structs
 //!
-//! All types stored in the gc heap must implement the [`TraceTo`] trait, which
+//! All types stored in the gc heap must implement the [`Trace`] trait, which
 //! tells the collector where in your struct it can find pointers to other
 //! things stored in the gc heap.
 //!
@@ -98,7 +98,7 @@
 //! something in the gc heap it is safe to dereference a [`Gc`] in the destructor,
 //! but **make sure** you aren't going to store it.
 //!
-//! As a general rule of thumb, if a type implements [`TraceTo`], it shouldn't
+//! As a general rule of thumb, if a type implements [`Trace`], it shouldn't
 //! dereference any [`Gc`]s in its destructor.
 //!
 //! The order objects are destroyed during collection is unspecified, so you
@@ -129,7 +129,7 @@
 //! [`Gc`]: ptr/struct.Gc.html
 //! [`Weak`]: ptr/struct.Weak.html
 //! [`Safe`]: ptr/struct.Safe.html
-//! [`TraceTo`]: trace/trait.TraceTo.html
+//! [`Trace`]: trace/trait.Trace.html
 //! [`Proxy::run`]: struct.Proxy.html#method.run
 //! [`Gc::is_alive`]: ptr/struct.Gc.html#method.is_alive
 //! [`Gc::get`]: ptr/struct.Gc.html#method.get
@@ -151,7 +151,7 @@ use allocator::Allocator;
 use ptr::GcBox;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
-use trace::TraceTo;
+use trace::Trace;
 
 trait AsTyped {
     fn as_typed<T>(&self) -> NonNull<GcBox<T>>;
@@ -223,7 +223,7 @@ impl Collector {
         func(proxy)
     }
 
-    fn alloc<T: TraceTo>(&mut self, val: T) -> NonNull<GcBox<T>> {
+    fn alloc<T: Trace>(&mut self, val: T) -> NonNull<GcBox<T>> {
         if self.should_collect() {
             self.run();
         }
@@ -395,7 +395,7 @@ impl<'a> Proxy<'a> {
     ///     assert_eq!(*val, 42);
     /// });
     /// ```
-    pub fn store<T: TraceTo>(&mut self, payload: T) -> Gc<'a, T> {
+    pub fn store<T: Trace>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
         Gc::from_raw_nonnull(ptr, PhantomData)
     }
@@ -559,9 +559,9 @@ mod tests {
     struct LinkedList<'a> {
         next: Option<Gc<'a, LinkedList<'a>>>,
     }
-    impl<'a> TraceTo for LinkedList<'a> {
-        fn trace_to(&self, tracer: &mut trace::Tracer) {
-            self.next.trace_to(tracer);
+    impl<'a> Trace for LinkedList<'a> {
+        fn trace(&self, tracer: &mut trace::Tracer) {
+            tracer.add_target(&self.next);
         }
     }
 
@@ -713,9 +713,9 @@ mod tests {
         struct SelfRef<'a> {
             self_ptr: RefCell<Option<Gc<'a, SelfRef<'a>>>>,
         }
-        impl<'a> TraceTo for SelfRef<'a> {
-            fn trace_to(&self, tracer: &mut trace::Tracer) {
-                self.self_ptr.trace_to(tracer);
+        impl<'a> Trace for SelfRef<'a> {
+            fn trace(&self, tracer: &mut trace::Tracer) {
+                tracer.add_target(&self.self_ptr);
             }
         }
         let mut col = Collector::new();
@@ -741,9 +741,9 @@ mod tests {
         struct List<'a> {
             ptr: Option<Gc<'a, List<'a>>>,
         }
-        impl<'a> TraceTo for List<'a> {
-            fn trace_to(&self, tracer: &mut trace::Tracer) {
-                self.ptr.trace_to(tracer);
+        impl<'a> Trace for List<'a> {
+            fn trace(&self, tracer: &mut trace::Tracer) {
+                tracer.add_target(&self.ptr);
             }
         }
         let mut col = Collector::new();
@@ -768,11 +768,11 @@ mod tests {
         // A struct that can hold references to itself
         struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);
 
-        // All things in the gc heap need to impl `TraceTo`
-        impl<'a> TraceTo for CyclicStruct<'a> {
-            fn trace_to(&self, tracer: &mut trace::Tracer) {
+        // All things in the gc heap need to impl `Trace`
+        impl<'a> Trace for CyclicStruct<'a> {
+            fn trace(&self, tracer: &mut trace::Tracer) {
                 // Tell the tracer where to find our gc pointer
-                self.0.trace_to(tracer);
+                tracer.add_target(&self.0);
             }
         }
 
