@@ -407,7 +407,7 @@ impl<'a> Proxy<'a> {
         Gc::from_raw_nonnull(ptr, PhantomData)
     }
 
-    /// Runs the gc.
+    /// Runs the gc, freeing unreachable objects.
     ///
     /// # Examples
     ///
