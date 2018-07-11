@@ -229,7 +229,7 @@ impl Collector {
     }
 
     fn mark(&self) {
-        // Count number of references to each other objects in the gc heap hold 
+        // Count number of references to each other objects in the gc heap hold
         for info in self.allocator.items.values() {
             self.mark_inter_connections(info.ptr);
         }

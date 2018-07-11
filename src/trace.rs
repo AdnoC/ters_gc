@@ -115,7 +115,7 @@
 //! ```
 //!
 //!
-//! 
+//!
 //! [`Trace`]: trait.Trace.html
 //! [`Tracer::add_target`]: struct.Tracer.html#method.add_target
 //! [`Gc`]: ../ptr/struct.Gc.html
@@ -161,7 +161,6 @@ impl Tracer {
         self.targets.into_iter()
     }
 }
-
 
 impl<'a, T> Trace for Gc<'a, T> {
     fn trace(&self, tracer: &mut Tracer) {

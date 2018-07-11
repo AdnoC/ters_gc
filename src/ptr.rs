@@ -1009,7 +1009,7 @@ mod tests {
         use trace::Trace;
 
         struct NoTrace<T>(pub T);
-        impl<T> Trace for NoTrace<T> { }
+        impl<T> Trace for NoTrace<T> {}
 
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
