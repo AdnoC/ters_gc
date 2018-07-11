@@ -435,6 +435,21 @@ impl<'a> Proxy<'a> {
         self.collector.pause();
     }
 
+    /// Whether or not automatic collection is paused.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     assert!(!proxy.paused());
+    /// });
+    /// ```
+    pub fn paused(&self) -> bool {
+        self.collector.paused
+    }
+
     /// Resume automatic collection.
     ///
     /// When storing something, will run collection if the gc heap is too big.
