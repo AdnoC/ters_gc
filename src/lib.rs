@@ -442,6 +442,9 @@ impl<'a> Proxy<'a> {
     ///     assert!(proxy.paused());
     /// });
     /// ```
+    ///
+    /// [resume]: #method.resume
+    /// [run]: #method.run
     pub fn pause(&mut self) {
         self.collector.pause();
     }
