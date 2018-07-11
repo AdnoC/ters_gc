@@ -212,7 +212,7 @@ impl Collector {
     /// Run the passed function, providing it access to gc operations via a
     /// [`Proxy`](struct.Proxy.html).
     ///
-    /// # Examles
+    /// # Examples
     ///
     /// ```
     /// use ters_gc::Collector;
@@ -391,6 +391,10 @@ impl<'a> Proxy<'a> {
     /// Stores something in the gc heap.
     ///
     /// If not paused, runs the gc if the heap got too big.
+    ///
+    /// # Examples
+    ///
+    ///
     pub fn store<T: TraceTo>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
         Gc::from_raw_nonnull(ptr, PhantomData)
