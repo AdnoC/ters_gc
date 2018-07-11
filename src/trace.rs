@@ -7,7 +7,7 @@ use UntypedGcBox;
 // Can act funny if you have Sp<Gc<T>> where Sp is a smart pointer that
 // doesn't impl TraceTo.
 pub trait TraceTo {
-    fn trace_to(&self, tracer: &mut Tracer);
+    fn trace_to(&self, _tracer: &mut Tracer) {  }
 }
 pub(crate) struct TraceDest(pub NonNull<UntypedGcBox>);
 
