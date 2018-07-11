@@ -160,6 +160,7 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// [downgrade]: #method.downgrade
 /// [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 /// [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
+// TODO Mention reference counts?
 pub struct Gc<'arena, T: 'arena> {
     ptr: GcRef<'arena, T>,
     life_tracker: LifeTracker,
@@ -528,7 +529,41 @@ impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
 impl<'a, T: 'a> Drop for Gc<'a, T> {
     /// Drops the `Gc`.
     ///
+    /// This will decrement the strong reference count if the inner object
+    /// is still alive.
     ///
+    /// The inner value is only `drop`ped when the object is reclaimed when
+    /// the gc is run.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    /// use ters_gc::trace::{TraceTo, Tracer};
+    ///
+    /// struct Foo;
+    ///
+    /// impl Drop for Foo {
+    ///     fn drop(&mut self) {
+    ///         println!("dropped!");
+    ///     }
+    /// }
+    ///
+    /// impl TraceTo for Foo { }
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let foo = proxy.store(Foo);
+    ///     let foo2 = foo.clone();
+    ///
+    ///     drop(foo);
+    ///
+    ///     proxy.run(); // Doesn't print anything
+    ///
+    ///     drop(foo2);
+    ///
+    ///     proxy.run(); // Prints "dropped!"
+    /// });
+    /// ```
     fn drop(&mut self) {
         if Self::is_alive(self) {
             self.decr_ref();
@@ -652,6 +687,8 @@ mod gc_impls {
 
 }
 
+// TODO: Note difference from Rc's Weak - Can upgrade even if strong_count == 0
+// so long as inner object wasn't reclaimed
 pub struct Weak<'arena, T: 'arena> {
     life_tracker: LifeTracker,
     ptr: GcRef<'arena, T>,
