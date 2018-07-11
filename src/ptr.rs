@@ -442,7 +442,6 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///
     /// ```
     /// use ters_gc::{Collector, Gc};
-    /// use std::mem::drop;
     ///
     /// let mut col = Collector::new();
     /// let zambia_gdp = col.run_with_gc(|mut proxy| {
@@ -489,7 +488,6 @@ impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
     ///
     /// ```
     /// use ters_gc::{Collector, Gc};
-    /// use std::mem::drop;
     ///
     /// Collector::new().run_with_gc(|mut proxy| {
     ///     let mut num_us_states = proxy.store(50);
@@ -759,7 +757,6 @@ impl<'a, T: 'a> Weak<'a, T> {
     ///
     /// ```
     /// use ters_gc::{Collector, Gc};
-    /// use std::mem::drop;
     ///
     /// Collector::new().run_with_gc(|mut proxy| {
     ///     let everest_height = proxy.store(8_848); // meters
