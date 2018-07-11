@@ -504,11 +504,48 @@ impl<'a> Proxy<'a> {
     }
 
     /// Set how much the threshold to run the gc when storing things grows.
+    ///
+    /// The higher the value the more objects you can store before storing triggers
+    /// automatic collection.
+    ///
+    /// Threshold is only updated after collection is run once.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     proxy.set_threshold_growth(0.75);
+    /// });
+    /// ```
     pub fn set_threshold_growth(&mut self, factor: f64) {
         self.collector.sweep_factor = factor;
     }
 
     /// Get how much the threshold to run the gc when storing things grows.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// let mut col = Collector::new();
+    ///
+    /// let init_thresh = col.run_with_gc(|proxy| proxy.threshold());
+    ///
+    /// col.run_with_gc(|mut proxy| {
+    ///     for _ in 0..(init_thresh + 1) {
+    ///         proxy.store(());
+    ///     }
+    /// });
+    ///
+    /// let new_thresh = col.run_with_gc(|proxy| proxy.threshold());
+    ///
+    /// assert!(init_thresh != new_thresh);
+    ///
+    /// ```
+    ///
     pub fn threshold(&self) -> usize {
         self.collector.collection_threshold
     }
