@@ -1,7 +1,7 @@
 use ptr::GcBox;
-use std::ptr::NonNull;
 use std::cell::Cell;
 use std::collections::HashMap;
+use std::ptr::NonNull;
 use traceable::{TraceTo, Tracer};
 use UntypedGcBox;
 use {AsTyped, AsUntyped};
@@ -155,7 +155,6 @@ fn get_rebox<T>() -> unsafe fn(NonNull<UntypedGcBox>) {
         Box::<GcBox<T>>::from_raw(ptr.cast::<GcBox<T>>().as_ptr());
     }
     rebox::<T>
-
 }
 
 fn get_refs_accessor<T>() -> unsafe fn(NonNull<UntypedGcBox>) -> usize {

@@ -1,9 +1,9 @@
-#[cfg(feature="nightly")]
+#[cfg(feature = "nightly")]
 extern crate compiletest_rs as compiletest; // https://github.com/laumann/compiletest-rs
 
 use std::path::PathBuf;
 
-#[cfg(feature="nightly")]
+#[cfg(feature = "nightly")]
 fn run_mode(mode: &'static str) {
     let mut config = compiletest::Config::default();
 
@@ -20,7 +20,7 @@ fn run_mode(mode: &'static str) {
     compiletest::run_tests(&config);
 }
 
-#[cfg(feature="nightly")]
+#[cfg(feature = "nightly")]
 #[test]
 fn compile_test() {
     run_mode("compile-fail");

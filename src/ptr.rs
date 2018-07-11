@@ -1,13 +1,12 @@
 use std::cell::Cell;
 use std::cell::RefCell;
-use std::ptr::NonNull;
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::ptr::NonNull;
 use std::rc::Rc;
-use UntypedGcBox;
 use trace::TraceTo;
 use Proxy;
-
+use UntypedGcBox;
 
 pub(crate) struct GcBox<T> {
     refs: Cell<usize>,
@@ -118,21 +117,18 @@ impl<'a, T: 'a> GcRef<'a, T> {
         ptr: NonNull<GcBox<T>>,
         _marker: PhantomData<&'a T>,
     ) -> GcRef<'a, T> {
-        GcRef {
-            _marker,
-            ptr,
-        }
+        GcRef { _marker, ptr }
     }
 
     unsafe fn get_gc_box<'t>(&'t self) -> &'t GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid
-        self.ptr.as_ref() 
+        self.ptr.as_ref()
     }
     unsafe fn get_gc_box_mut<'t>(&'t mut self) -> &'t mut GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid
-        self.ptr.as_mut() 
+        self.ptr.as_mut()
     }
 }
 
@@ -161,11 +157,9 @@ pub struct Gc<'arena, T: 'arena> {
     life_tracker: LifeTracker,
 }
 impl<'a, T: 'a> Gc<'a, T> {
-    pub(crate) fn from_raw_gcref(
-        gc_ref: GcRef<'a, T>,
-        ) -> Gc<'a, T> {
+    pub(crate) fn from_raw_gcref(gc_ref: GcRef<'a, T>) -> Gc<'a, T> {
         let gc = Gc {
-            life_tracker: unsafe{ gc_ref.get_gc_box().tracker() },
+            life_tracker: unsafe { gc_ref.get_gc_box().tracker() },
             ptr: gc_ref,
         };
         gc.incr_ref();
@@ -176,7 +170,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     pub(crate) fn from_raw_nonnull(
         ptr: NonNull<GcBox<T>>,
         _marker: PhantomData<&'a T>,
-        ) -> Gc<'a, T> {
+    ) -> Gc<'a, T> {
         Gc::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker))
     }
 
@@ -208,9 +202,7 @@ impl<'a, T: 'a> Gc<'a, T> {
             // This `Gc` is garunteed to be the sole strong reference to the data.
             // So, we can safely get a mut reference to the `GcBox` since there
             // is nobody else who can who can access the data.
-            unsafe {
-                Some(this.get_gc_box_mut().borrow_mut())
-            }
+            unsafe { Some(this.get_gc_box_mut().borrow_mut()) }
         } else {
             None
         }
@@ -278,7 +270,7 @@ impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
         if !Gc::is_alive(this) {
             panic!("gc pointer was already dead");
         } else {
-            // TODO Split case in 2 if I split data's destructure with GcBox's 
+            // TODO Split case in 2 if I split data's destructure with GcBox's
             if Gc::ref_count(this) != 1 || Gc::weak_count(this) != 0 {
                 // Clone the data into a new Gc
                 *this = proxy.store((**this).clone());
@@ -323,19 +315,15 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
 /// are implemented since it is a smart pointer
 mod gc_impls {
     use super::Gc;
+    use std::borrow;
     use std::cmp::Ordering;
     use std::fmt;
-    use std::hash::{Hasher, Hash};
-    use std::borrow;
+    use std::hash::{Hash, Hasher};
 
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Gc<'a, T> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match Self::get(self) {
-                Some(value) => {
-                    f.debug_struct("Gc")
-                        .field("value", value)
-                        .finish()
-                },
+                Some(value) => f.debug_struct("Gc").field("value", value).finish(),
                 None => {
                     struct DeadPlaceholder;
 
@@ -420,7 +408,6 @@ mod gc_impls {
 
 }
 
-
 pub struct Weak<'arena, T: 'arena> {
     life_tracker: LifeTracker,
     ptr: GcRef<'arena, T>,
@@ -496,11 +483,7 @@ mod weak_impls {
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Weak<'a, T> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self.get() {
-                Some(value) => {
-                    f.debug_struct("Weak")
-                        .field("value", value)
-                        .finish()
-                },
+                Some(value) => f.debug_struct("Weak").field("value", value).finish(),
                 None => {
                     struct DeadPlaceholder;
 
@@ -657,24 +640,33 @@ mod tests {
     fn variance_works() {
         // Check compile-test for cases that are illegal
         fn _variant_with_gc() {
-            fn _expect<'a>(_: &'a i32, _: Gc<&'a i32>) { unimplemented!() }
-            fn _provide(m: Gc<&'static i32>) { let val = 13; _expect(&val, m); }
+            fn _expect<'a>(_: &'a i32, _: Gc<&'a i32>) {
+                unimplemented!()
+            }
+            fn _provide(m: Gc<&'static i32>) {
+                let val = 13;
+                _expect(&val, m);
+            }
         }
 
         fn _variant_with_weak() {
-            fn _expect<'a>(_: &'a i32, _: Weak<&'a i32>) { unimplemented!() }
-            fn _provide(m: Weak<&'static i32>) { let val = 13; _expect(&val, m); }
+            fn _expect<'a>(_: &'a i32, _: Weak<&'a i32>) {
+                unimplemented!()
+            }
+            fn _provide(m: Weak<&'static i32>) {
+                let val = 13;
+                _expect(&val, m);
+            }
         }
-
     }
 
     #[test]
     fn std_impls_gc() {
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
+            use std::borrow::Borrow;
             use std::cmp::Ordering;
             use std::hash::{Hash, Hasher};
-            use std::borrow::Borrow;
             fn calculate_hash<H: Hash>(h: &H) -> u64 {
                 use std::collections::hash_map::DefaultHasher;
                 let mut s = DefaultHasher::new();
@@ -815,7 +807,7 @@ mod tests {
                 let num_ref = Gc::make_mut(&mut num, &mut proxy);
                 {
                     // Checking that the mut ref doesn't take proxy's lifetime
-                    let _ = proxy.store(0); 
+                    let _ = proxy.store(0);
                 }
                 *num_ref = 42;
             }

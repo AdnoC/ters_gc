@@ -8,7 +8,7 @@
 //!
 //! TODO: Mention that Gc is basically improved Rc
 //!
-//! A mark-and-sweep garbage collecting allocator 
+//! A mark-and-sweep garbage collecting allocator.
 //! Based loosely on the [`Tiny Garbage Collector`].
 //!
 //! Provides the [`Gc`] type, essentially an [`Rc`] that can handle cycles.
@@ -146,16 +146,15 @@ pub use ptr::Gc;
 pub mod trace {
     pub use traceable::{TraceTo, Tracer};
 }
-mod traceable;
 mod allocator;
+mod traceable;
 
 use allocator::AllocInfo;
 use allocator::Allocator;
 use ptr::GcBox;
-use std::ptr::NonNull;
 use std::marker::PhantomData;
+use std::ptr::NonNull;
 use traceable::TraceTo;
-
 
 trait AsTyped {
     fn as_typed<T>(&self) -> NonNull<GcBox<T>>;
@@ -173,7 +172,6 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
         self.cast()
     }
 }
-
 
 /// State container for grabage collection.
 /// Access to the API goes through [`Proxy`].
@@ -221,7 +219,7 @@ impl Collector {
     ///
     /// let val = col.run_with_gc(|_proxy| 42);
     /// assert_eq!(val, 42);
-    /// 
+    ///
     /// ```
     pub fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
         let proxy = self.proxy();
@@ -246,7 +244,10 @@ impl Collector {
             self.mark_inter_connections(info.ptr);
         }
 
-        let roots = self.allocator.items.values()
+        let roots = self
+            .allocator
+            .items
+            .values()
             .filter(|info| Self::is_object_reachable(info));
 
         for info in roots {
@@ -346,12 +347,8 @@ impl Collector {
     fn ideal_size(&self) -> usize {
         // Primes taken from tgc
         const PRIMES: [usize; 24] = [
-            0,       1,       5,       11,
-            23,      53,      101,     197,
-            389,     683,     1259,    2417,
-            4733,    9371,    18617,   37097,
-            74093,   148073,  296099,  592019,
-            1100009, 2200013, 4400021, 8800019
+            0, 1, 5, 11, 23, 53, 101, 197, 389, 683, 1259, 2417, 4733, 9371, 18617, 37097, 74093,
+            148073, 296099, 592019, 1100009, 2200013, 4400021, 8800019,
         ];
 
         let target = (self.num_tracked() + 1) as f64 / self.load_factor;
@@ -581,7 +578,6 @@ mod tests {
         use std::mem::drop;
         let mut col = Collector::new();
         col.run_with_gc(|mut proxy| {
-
             for i in 0..60 {
                 let num = proxy.store(i);
                 assert_eq!(*num, i);
@@ -773,7 +769,6 @@ mod tests {
     fn min_cycle() {
         use std::cell::RefCell;
 
-
         // A struct that can hold references to itself
         struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);
 
@@ -785,13 +780,11 @@ mod tests {
             }
         }
 
-
         // Make a new collector to keep the gc state
         let mut col = Collector::new();
 
         // Find out the meaning of life, and allow use of the gc while doing so
         let meaning = col.run_with_gc(|mut proxy| {
-
             // Do some computations that are best expressed with a cyclic data structure
             {
                 let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));

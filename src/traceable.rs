@@ -1,7 +1,7 @@
 use ptr::{Gc, GcBox, Weak};
 use std::ptr::NonNull;
-use UntypedGcBox;
 use AsUntyped;
+use UntypedGcBox;
 
 // Impls: For every object `obj` that impls TraceTo, call `obj.trace_to(tracer)`.
 // Can act funny if you have Sp<Gc<T>> where Sp is a smart pointer that
