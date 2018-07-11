@@ -88,23 +88,16 @@ impl Drop for AllocInfo {
 pub(crate) struct Allocator {
     pub items: HashMap<*mut UntypedGcBox, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
-    // max_ptr: usize,
-    // min_ptr: usize,
 }
 
 impl Allocator {
     pub fn new() -> Allocator {
         Allocator {
             items: Default::default(),
-            // max_ptr: 0,
-            // min_ptr: ::std::usize::MAX,
         }
     }
     pub fn alloc<T: Trace>(&mut self, value: T) -> NonNull<GcBox<T>> {
-        // use std::cmp::{min, max};
         let info = AllocInfo::new(value);
-        // self.max_ptr = max(self.max_ptr, info.ptr as usize);
-        // self.min_ptr = min(self.min_ptr, info.ptr as usize);
         let ptr = info.ptr;
         self.items.insert(ptr.as_ptr(), info);
         ptr.as_typed()
@@ -119,12 +112,6 @@ impl Allocator {
         let boxed: Box<GcBox<T>> = unsafe { Box::from_raw(ptr.as_typed().as_ptr()) };
         boxed.reclaim_value()
     }
-
-    // pub fn is_ptr_in_range(&self, _ptr: *const UntypedGcBox) -> bool {
-    //     true
-    //     // let ptr_val = ptr as usize;
-    //     // self.min_ptr >= ptr_val && self.max_ptr <= ptr_val
-    // }
 
     // pub fn is_ptr_tracked<T>(&self, ptr: *const T) -> bool {
     //     let ptr: *const UntypedGcBox = ptr as *const _;
