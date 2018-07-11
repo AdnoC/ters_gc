@@ -550,7 +550,7 @@ impl<'a> Proxy<'a> {
         self.collector.collection_threshold
     }
 
-    // Tested in ptr
+    // Tested in `::ptr`
     pub(crate) fn try_remove<T>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
         self.collector.try_remove(gc)
     }
