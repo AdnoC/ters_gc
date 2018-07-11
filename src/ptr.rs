@@ -8,8 +8,6 @@ use UntypedGcBox;
 use trace::TraceTo;
 use Proxy;
 
-/// TODO: Send & Sync safety
-
 
 pub(crate) struct GcBox<T> {
     refs: Cell<usize>,
