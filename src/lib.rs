@@ -63,7 +63,7 @@
 //! and dereferences to a shared reference. Its API surface is meant to mimick
 //! that of [`Rc`].
 //!
-//! The [`Weak`] pointer, isn't counted during reachability analysis.
+//! The [`Weak`] pointer isn't counted during reachability analysis.
 //! You can have thousands of them, but if they are the only things
 //! referencing an object, that object will be freed next time the collector
 //! is run. It knows when the pointed-to object has been freed and will deny
@@ -75,7 +75,7 @@
 //! tells the collector where in your struct it can find pointers to other
 //! things stored in the gc heap.
 //!
-//! *TODO: Mention that most standard types have it implemented*
+//! [`Trace`] is implemented for many of the types in `std`.
 //!
 //! # Limitations
 //!
@@ -110,6 +110,8 @@
 //!
 //! ## The garbage collector is for single threaded use only
 //!
+//! None of the pointer types, nor [`Proxy`] should be [`Sync`] or [`Send`].
+//!
 //!
 //!
 //!
@@ -125,6 +127,8 @@
 //! [`Gc::get`]: ptr/struct.Gc.html#method.get
 //! [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
 //! [`mem::forget`]: https://doc.rust-lang.org/std/mem/fn.forget.html
+//! [`Sync`]
+//! [`Send`]
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 //! [`Tiny Garbage Collector`]: http://tinygc.sourceforge.net/
