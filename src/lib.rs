@@ -3,10 +3,6 @@
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
 //!
-//! *TODO: Make run_with_gc safe?*
-//! *TODO: Make Weak just a Gc with an Rc<Cell<bool>>*
-//! *TODO: Make Safe just a Weak with impl TraceTo*
-//! *TODO: Remove all stack-related mechanisms*
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
 //! *TODO: Ensure Proxy is !Send*
 //! *TODO: Document UB when deref Gc in destructor*
@@ -265,11 +261,10 @@ impl Collector {
         let inter_refs = info.inter_marks();
         let total_refs = info.ref_count();
 
-        // FIXME This comment
-        // Don't actually do the subtraction, since it will underflow if
-        // zombie values of an address are found on the stack.
-        // let heap_refs = total_refs - stack_refs - refs_in_gc;
-        // If we know it is reachable or the only refs are hidden in the heap
+        // If the object has more refs than we found, then there exists a
+        // reference to that object outside of the gc heap. We assume that
+        // all references stored outside of the gc heap are reachable.
+        // Otherwise, the object is reachable if we marked it reachable.
         total_refs > inter_refs || info.is_marked_reachable()
     }
 
@@ -369,6 +364,11 @@ impl<'a> Proxy<'a> {
     /// Gets the number of objects in the gc heap.
     pub fn num_tracked(&self) -> usize {
         self.collector.num_tracked()
+    }
+
+    /// Set how much the threshold to run the gc when storing things grows.
+    pub fn threshold_growth(&mut self, factor: f64) {
+        self.collector.sweep_factor = factor;
     }
 
     // Tested in ptr
