@@ -1003,7 +1003,11 @@ mod tests {
 
     #[test]
     fn casting_weak() {
-        use trace::NoTrace;
+        use trace::TraceTo;
+
+        struct NoTrace<T>(pub T);
+        impl<T> TraceTo for NoTrace<T> { }
+
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {
             let num = proxy.store(NoTrace(Cell::new(0)));
