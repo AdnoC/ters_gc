@@ -148,11 +148,14 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// A single-threaded garbage collected pointer.
 /// 'Gc' stands for 'Garbage Collected'.
 ///
+/// The API is meant to mirror that of [`Rc`].
+///
 /// The inherent methods of `Gc` are all associated functions, which means you
 /// have to call them as e.g. [`Gc::downgrade(&value)`][downgrade] instead of
 /// `value.downgrade()`. This avoids conflicts with the inner type `T`.
 ///
 /// [downgrade]: #method.downgrade
+/// [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 pub struct Gc<'arena, T: 'arena> {
     ptr: GcRef<'arena, T>,
     life_tracker: LifeTracker,
@@ -169,23 +172,28 @@ impl<'a, T: 'a> Gc<'a, T> {
         assert!(Gc::is_alive(&gc));
         gc
     }
+
     pub(crate) fn from_raw_nonnull(
         ptr: NonNull<GcBox<T>>,
         _marker: PhantomData<&'a T>,
         ) -> Gc<'a, T> {
         Gc::from_raw_gcref(GcRef::from_raw_nonnull(ptr, _marker))
     }
+
     fn incr_ref(&self) {
         assert!(Gc::is_alive(self));
         Gc::get_gc_box(self).incr_ref();
     }
+
     fn decr_ref(&self) {
         assert!(Gc::is_alive(self));
         Gc::get_gc_box(self).decr_ref();
     }
+
     pub fn is_alive(this: &Self) -> bool {
         this.life_tracker.is_alive()
     }
+
     // TODO in doc, mention safe to use during Drop::drop
     pub fn get(this: &Self) -> Option<&T> {
         if Self::is_alive(this) {
@@ -194,6 +202,7 @@ impl<'a, T: 'a> Gc<'a, T> {
             None
         }
     }
+
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
         if Self::is_alive(this) && Self::ref_count(this) == 1 && Self::weak_count(this) == 0 {
             // This `Gc` is garunteed to be the sole strong reference to the data.
@@ -206,9 +215,11 @@ impl<'a, T: 'a> Gc<'a, T> {
             None
         }
     }
+
     pub(crate) fn get_nonnull_gc_box(&self) -> NonNull<GcBox<T>> {
         self.ptr.ptr
     }
+
     fn get_gc_box(&self) -> &GcBox<T> {
         assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
@@ -216,6 +227,7 @@ impl<'a, T: 'a> Gc<'a, T> {
         // this isn't called when dead).
         unsafe { self.ptr.get_gc_box() }
     }
+
     unsafe fn get_gc_box_mut(&mut self) -> &mut GcBox<T> {
         assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
@@ -223,15 +235,19 @@ impl<'a, T: 'a> Gc<'a, T> {
         // this isn't called when dead).
         self.ptr.get_gc_box_mut()
     }
+
     pub fn ptr_eq(this: &Self, other: &Self) -> bool {
         this.ptr.ptr == other.ptr.ptr
     }
+
     pub(crate) fn ref_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).ref_count()
     }
+
     pub(crate) fn weak_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).weak_count()
     }
+
     pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
         let weak = Weak {
             life_tracker: this.life_tracker.clone(),
@@ -240,9 +256,11 @@ impl<'a, T: 'a> Gc<'a, T> {
         weak.incr_weak();
         weak
     }
+
     fn get_borrow(&self) -> &T {
         Self::get(self).expect("gc pointer was already dead")
     }
+
     pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
         if Self::is_alive(self) {
             Some(self.ptr.ptr)
@@ -250,6 +268,7 @@ impl<'a, T: 'a> Gc<'a, T> {
             None
         }
     }
+
     pub fn try_unwrap(this: Self, proxy: &mut Proxy<'a>) -> Result<T, Self> {
         proxy.try_remove(this)
     }
