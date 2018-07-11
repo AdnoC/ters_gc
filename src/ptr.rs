@@ -40,7 +40,7 @@ impl<T> GcBox<T> {
     pub fn decr_weak(&self) {
         self.weak.set(self.weak.get() - 1);
     }
-    pub fn ref_count(&self) -> usize {
+    pub fn strong_count(&self) -> usize {
         self.refs.get()
     }
     pub fn weak_count(&self) -> usize {
@@ -290,7 +290,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
     /// [`clone`]: https://doc.rust-lang.org/std/clone/trait.Clone.html#tymethod.clone
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
-        if Self::is_alive(this) && Self::ref_count(this) == 1 && Self::weak_count(this) == 0 {
+        if Self::is_alive(this) && Self::strong_count(this) == 1 && Self::weak_count(this) == 0 {
             // This `Gc` is garunteed to be the sole strong reference to the data.
             // So, we can safely get a mut reference to the `GcBox` since there
             // is nobody else who can who can access the data.
@@ -352,11 +352,11 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///     let months = proxy.store(12);
     ///     let also_months = months.clone();
     ///
-    ///     assert_eq!(Gc::ref_count(&months), 2);
+    ///     assert_eq!(Gc::strong_count(&months), 2);
     /// });
     /// ```
-    pub fn ref_count(this: &Gc<'a, T>) -> usize {
-        Gc::get_gc_box(this).ref_count()
+    pub fn strong_count(this: &Gc<'a, T>) -> usize {
+        Gc::get_gc_box(this).strong_count()
     }
 
     /// Gets the number of [`Weak`] pointers to this value.
@@ -501,7 +501,7 @@ impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
             panic!("gc pointer was already dead");
         } else {
             // TODO Split case in 2 if I split data's destructure with GcBox's
-            if Gc::ref_count(this) != 1 || Gc::weak_count(this) != 0 {
+            if Gc::strong_count(this) != 1 || Gc::weak_count(this) != 0 {
                 // Clone the data into a new Gc
                 *this = proxy.store((**this).clone());
             }
@@ -781,7 +781,7 @@ mod tests {
     use Proxy;
 
     #[test]
-    fn ref_count_works() {
+    fn strong_count_works() {
         use std::mem::drop;
         let mut col = Collector::new();
         let body = |mut proxy: Proxy| {

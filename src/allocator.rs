@@ -161,7 +161,7 @@ fn get_refs_accessor<T>() -> unsafe fn(NonNull<UntypedGcBox>) -> usize {
     unsafe fn refs<T>(ptr: NonNull<UntypedGcBox>) -> usize {
         let ptr = ptr.as_typed();
         let gc_box: &GcBox<T> = ptr.as_ref();
-        gc_box.ref_count()
+        gc_box.strong_count()
     }
     refs::<T>
 }
