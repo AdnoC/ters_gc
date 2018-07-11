@@ -219,7 +219,6 @@ impl<'a, T: 'a> Gc<'a, T> {
         this.life_tracker.is_alive()
     }
 
-    // TODO in doc, mention safe to use during Drop::drop
     /// Safely obtain a reference to the inner value.
     ///
     /// Returns [`None`] if the pointed-to object has already been freed
@@ -740,8 +739,6 @@ mod gc_impls {
 /// [`rc::Weak`]: https://doc.rust-lang.org/std/rc/struct.Weak.html
 /// [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
 /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
-// TODO: Note difference from Rc's Weak - Can upgrade even if strong_count == 0
-// so long as inner object wasn't reclaimed
 pub struct Weak<'arena, T: 'arena> {
     life_tracker: LifeTracker,
     ptr: GcRef<'arena, T>,
