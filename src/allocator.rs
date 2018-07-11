@@ -6,17 +6,6 @@ use trace::{Trace, Tracer};
 use UntypedGcBox;
 use {AsTyped, AsUntyped};
 
-trait AsConstPtr {
-    type Target;
-    fn as_const_ptr(&self) -> *const Self::Target;
-}
-impl<T> AsConstPtr for NonNull<T> {
-    type Target = T;
-    fn as_const_ptr(&self) -> *const T {
-        self.as_ptr() as *const _
-    }
-}
-
 /// Type-erased allocation info
 pub(crate) struct AllocInfo {
     pub ptr: NonNull<UntypedGcBox>,
