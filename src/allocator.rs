@@ -135,10 +135,12 @@ impl Allocator {
         self.items.get(&(ptr as *mut _))
     }
 
+    // Stub
     pub fn should_shrink_items(&self) -> bool {
         false
     }
 
+    // Not a great way to shrink with HashMap
     pub fn shrink_items(&mut self) {}
 }
 

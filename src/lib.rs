@@ -231,7 +231,9 @@ impl Collector {
     }
 
     fn run(&mut self) {
+        // Find the tracked objects that the client can still use
         self.mark();
+        // Remove the objects that the client can't
         self.sweep();
     }
 
@@ -255,6 +257,7 @@ impl Collector {
         }
     }
 
+    // Increment an object's counter for each reference to it this object holds
     fn mark_inter_connections(&self, ptr: NonNull<UntypedGcBox>) {
         // assert!(self.allocator.is_ptr_in_range(ptr));
 
@@ -267,6 +270,7 @@ impl Collector {
         }
     }
 
+    // Recusively mark all children as reachable
     fn mark_children_reachable(&self, ptr: NonNull<UntypedGcBox>) {
         // assert!(self.allocator.is_ptr_in_range(ptr));
 
@@ -282,6 +286,7 @@ impl Collector {
         }
     }
 
+    // Can the client access the object?
     fn is_object_reachable(info: &AllocInfo) -> bool {
         let inter_refs = info.inter_marks();
         let total_refs = info.ref_count();
@@ -293,6 +298,7 @@ impl Collector {
         total_refs > inter_refs || info.is_marked_reachable()
     }
 
+    // Reclaim unreachable objects
     fn sweep(&mut self) {
         let mut unreachable_objects = vec![];
         for info in self.allocator.items.values() {
@@ -307,6 +313,7 @@ impl Collector {
             self.allocator.free(ptr);
         }
 
+        // Update automatic collection threshold
         self.update_collection_threshold();
 
         if self.allocator.should_shrink_items() {
@@ -330,6 +337,7 @@ impl Collector {
         Proxy { collector: self }
     }
     fn try_remove<'a, T: 'a>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
+        // Gc must be valid and the only strong pointer to the object
         if Gc::is_alive(&gc) && Gc::strong_count(&gc) == 1 {
             let ptr = gc.get_nonnull_gc_box().as_untyped();
             Ok(self.allocator.remove::<T>(ptr))
@@ -364,6 +372,7 @@ impl Collector {
         }
     }
 
+    // Update point at which we do automatic collection
     fn update_collection_threshold(&mut self) {
         let num_tracked = self.num_tracked();
         let additional = (num_tracked as f64 * self.sweep_factor) as usize;
