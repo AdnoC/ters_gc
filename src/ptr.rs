@@ -213,6 +213,30 @@ impl<'a, T: 'a> Gc<'a, T> {
     }
 
     // TODO in doc, mention safe to use during Drop::drop
+    /// Safely obtain a reference to the inner value.
+    ///
+    /// Returns [`None`] if the pointed-to object has already been freed
+    /// ([`is_alive`] is `false`)
+    ///
+    /// Can be used in destructors to obtain a reference to the pointed-to object
+    /// if it is still valid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let dk_high_score = proxy.store(1_247_700);
+    ///
+    ///     let score_ref = Gc::get(&dk_high_score).unwrap();
+    ///
+    ///     assert_eq!(*score_ref, 1_247_700);
+    /// });
+    /// ```
+    ///
+    /// [`is_alive`]: #method.is_alive
+    /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
     pub fn get(this: &Self) -> Option<&T> {
         if Self::is_alive(this) {
             Some(this.get_gc_box().borrow())
@@ -221,6 +245,49 @@ impl<'a, T: 'a> Gc<'a, T> {
         }
     }
 
+    /// Returns a mutable reference to the inner value,
+    /// if the inner object is still alive and there are no other
+    /// `Gc` or [`Weak`] pointers to the same object.
+    ///
+    /// Returns [`None`] otherwise, because it is either not safe to access the
+    /// object or it is not safe to mutate a shared value.
+    ///
+    /// See also [`make_mut`], which will [`clone`] the inner value when it's shared.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let mut gpa = proxy.store(2.4);
+    ///
+    ///     *Gc::get_mut(&mut gpa).unwrap() = 4.0;
+    ///
+    ///     assert_eq!(*gpa, 4.0);
+    ///
+    ///     {
+    ///         let other_gpa_ptr = gpa.clone();
+    ///
+    ///         assert!(Gc::get_mut(&mut gpa).is_none());
+    ///     }
+    ///
+    ///     assert!(Gc::get_mut(&mut gpa).is_some());
+    ///
+    ///     {
+    ///         let weak_other_gpa_ptr = Gc::downgrade(&gpa);
+    ///
+    ///         assert!(Gc::get_mut(&mut gpa).is_none());
+    ///     }
+    ///
+    ///     assert!(Gc::get_mut(&mut gpa).is_some());
+    /// });
+    /// ```
+    ///
+    /// [`make_mut`]: #method.make_mut
+    /// [`Weak`]: struct.Weak.html
+    /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
+    /// [`clone`]: https://doc.rust-lang.org/std/clone/trait.Clone.html#tymethod.clone
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
         if Self::is_alive(this) && Self::ref_count(this) == 1 && Self::weak_count(this) == 0 {
             // This `Gc` is garunteed to be the sole strong reference to the data.
