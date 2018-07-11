@@ -198,6 +198,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// Allows you to check in destructors that the data a `Gc` point to has
     /// not already been reclaimed.
     ///
+    /// Safe to use in destructors.
+    ///
     /// # Examples
     ///
     /// ```
@@ -221,6 +223,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///
     /// Can be used in destructors to obtain a reference to the pointed-to object
     /// if it is still valid.
+    ///
+    /// Safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -254,6 +258,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// object or it is not safe to mutate a shared value.
     ///
     /// See also [`make_mut`], which will [`clone`] the inner value when it's shared.
+    ///
+    /// Safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -323,6 +329,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// Returns `true` if the two `Gc`s point to the same value
     /// (not just values that compare as equal).
     ///
+    /// Safe to use in destructors.
+    ///
     /// # Examples
     ///
     /// ```
@@ -380,6 +388,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     }
 
     /// Creates a new [`Weak`] pointer to this value.
+    ///
+    /// Safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -450,6 +460,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///
     /// [`Proxy`]: ../struct.Proxy.html
     /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html
+    // Not safe in destructor: Allocator::remove dereferences the passed ptr
     pub fn try_unwrap(this: Self, proxy: &mut Proxy<'a>) -> Result<T, Self> {
         proxy.try_remove(this)
     }
