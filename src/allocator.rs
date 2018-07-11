@@ -102,9 +102,11 @@ impl Allocator {
         self.items.insert(ptr.as_ptr(), info);
         ptr.as_typed()
     }
+    /// Just remove an object
     pub fn free(&mut self, ptr: NonNull<UntypedGcBox>) {
         self.items.remove(&ptr.as_ptr()); // Will be deallocated by Drop
     }
+    /// Remove an object and return it's value
     pub fn remove<T>(&mut self, ptr: NonNull<UntypedGcBox>) -> T {
         use std::mem::forget;
         let item = self.items.remove(&ptr.as_ptr());
@@ -140,6 +142,7 @@ fn store_single_value<T>(value: T) -> NonNull<GcBox<T>> {
 }
 
 fn get_rebox<T>() -> unsafe fn(NonNull<UntypedGcBox>) {
+    /// Must be called with accompanying pointer
     unsafe fn rebox<T>(ptr: NonNull<UntypedGcBox>) {
         Box::<GcBox<T>>::from_raw(ptr.cast::<GcBox<T>>().as_ptr());
     }
@@ -147,6 +150,7 @@ fn get_rebox<T>() -> unsafe fn(NonNull<UntypedGcBox>) {
 }
 
 fn get_refs_accessor<T>() -> unsafe fn(NonNull<UntypedGcBox>) -> usize {
+    /// Must be called with accompanying pointer
     unsafe fn refs<T>(ptr: NonNull<UntypedGcBox>) -> usize {
         let ptr = ptr.as_typed();
         let gc_box: &GcBox<T> = ptr.as_ref();
@@ -156,6 +160,7 @@ fn get_refs_accessor<T>() -> unsafe fn(NonNull<UntypedGcBox>) -> usize {
 }
 
 fn get_tracer<T: Trace>() -> unsafe fn(NonNull<UntypedGcBox>) -> Tracer {
+    /// Must be called with accompanying pointer
     unsafe fn tracer<T: Trace>(ptr: NonNull<UntypedGcBox>) -> Tracer {
         let mut tracer = Tracer::new();
         let ptr = ptr.as_typed();
