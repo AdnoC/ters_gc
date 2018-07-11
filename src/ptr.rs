@@ -391,6 +391,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///
     /// This will succeed even if there are outstanding weak references.
     ///
+    /// Requires access to the [`Proxy`] in order to stop tracking the object.
+    ///
     /// # Examples
     ///
     /// ```
@@ -415,12 +417,54 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// assert_eq!(zambia_gdp, 19_550_000_000);
     /// ```
     ///
+    /// [`Proxy`]: ../struct.Proxy.html
     /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html
     pub fn try_unwrap(this: Self, proxy: &mut Proxy<'a>) -> Result<T, Self> {
         proxy.try_remove(this)
     }
 }
 impl<'a, T: 'a + Clone + TraceTo> Gc<'a, T> {
+    /// Makes a mutable reference into the given `Gc`.
+    ///
+    /// If there are other `Gc` or [`Weak`] pointers to the same value,
+    /// then `make_mut` will invoke [`clone`] on the inner value to
+    /// ensure unique ownership. This is also referred to as clone-on-write.
+    ///
+    /// Requires access to the [`Proxy`] in case a new `Gc` has to be created.
+    ///
+    /// See also [`get_mut`], which will fail rather than cloning.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the inner object has already been freed ([`is_alive`] is
+    /// `false`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    /// use std::mem::drop;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     let mut num_us_states = proxy.store(50);
+    ///
+    ///     let mut num_without_hawaii = num_us_states.clone();
+    ///     *Gc::make_mut(&mut num_without_hawaii, &mut proxy) = 49;
+    ///
+    ///     assert_eq!(*num_us_states, 50);
+    ///     assert_eq!(*num_without_hawaii, 49);
+    ///
+    ///     *Gc::make_mut(&mut num_us_states, &mut proxy) = 500;
+    ///
+    ///     assert_eq!(*num_us_states, 500);
+    /// });
+    /// ```
+    ///
+    /// [`Proxy`]: ../struct.Proxy.html
+    /// [`is_alive`]: #method.is_alive
+    /// [`get_mut`]: #method.get_mut
+    /// [`Weak`]: struct.Weak.html
+    /// [`clone`]: https://doc.rust-lang.org/std/clone/trait.Clone.html#tymethod.clone
     pub fn make_mut<'g>(this: &'g mut Self, proxy: &mut Proxy<'a>) -> &'g mut T {
         if !Gc::is_alive(this) {
             panic!("gc pointer was already dead");
