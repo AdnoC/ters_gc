@@ -236,19 +236,22 @@ impl Collector {
     }
 
     fn mark(&self) {
+        // Count number of references to each other objects in the gc heap hold 
         for info in self.allocator.items.values() {
             self.mark_inter_connections(info.ptr);
         }
 
+        // Anything that is reachable must be a root
         let roots = self
             .allocator
             .items
             .values()
             .filter(|info| Self::is_object_reachable(info));
 
+        // Mark roots reachable and mark all their children reachable
         for info in roots {
-            self.mark_children_reachable(info.ptr);
             info.mark_reachable();
+            self.mark_children_reachable(info.ptr);
         }
     }
 
