@@ -118,7 +118,7 @@ impl Clone for LifeTracker {
     }
 }
 
-pub struct GcRef<'arena, T: 'arena> {
+pub(crate) struct GcRef<'arena, T: 'arena> {
     _marker: PhantomData<&'arena T>,
     ptr: NonNull<GcBox<T>>,
 }
