@@ -2,11 +2,14 @@
 //!
 //! A type must implement [`Trace`] to be stored in the gc heap.
 //!
+//! [`Trace`] is implemented for most standard library types.
+//!
 //! [`Trace`] lets the collector know what tracked objects an object has
 //! references to. An incomplete [`Trace`] implementation will result in
 //! memory leaks.
 //!
-//! A correct [`Trace`] implementation calls  TODO Finish
+//! A correct [`Trace`] implementation calls `Tracer::add_target` on all members
+//! that can contain a [`Gc`].
 //!
 //! [`Trace`]: trait.Trace.html
 
@@ -91,6 +94,24 @@ mod trace_impls {
         isize usize
         f32 f64
         char str
+        String
+        std::cmp::Ordering
+        std::ffi::CStr std::ffi::CString
+        std::ffi::OsStr std::ffi::OsString
+        std::fs::DirEntry std::fs::File
+        std::fs::FileType std::fs::Metadata
+        std::fs::OpenOptions std::fs::Permissions
+        std::io::Repeat std::io::Sink
+        std::io::Stderr std::io::Stdin
+        std::io::Stdout std::io::ErrorKind
+        std::net::Ipv4Addr std::net::Ipv6Addr
+        std::net::SocketAddrV4 std::net::SocketAddrV6
+        std::net::TcpStream std::net::UdpSocket
+        std::net::IpAddr std::net::SocketAddr
+        std::path::Path std::path::PathBuf
+        std::sync::Condvar
+        std::time::Duration std::time::Instant
+        std::time::SystemTime
     }
     impl<'a> Trace for &'a str {
         fn trace(&self, _: &mut Tracer) {
@@ -168,6 +189,11 @@ mod trace_impls {
             tracer.add_target(contents);
         }
     }
+    impl<'a, T: Trace + 'a + ToOwned + ?Sized> Trace for std::borrow::Cow<'a, T> {
+        fn trace(&self, tracer: &mut Tracer) {
+            tracer.add_target(&*self);
+        }
+    }
     impl<T: Trace> Trace for Vec<T> {
         fn trace(&self, tracer: &mut Tracer) {
             for tracee in self {
@@ -181,12 +207,14 @@ mod trace_impls {
             tracer.add_target(contents);
         }
     }
+    impl<T: Trace + ?Sized> Trace for std::rc::Weak<T> {}
     impl<T: Trace + ?Sized> Trace for std::sync::Arc<T> {
         fn trace(&self, tracer: &mut Tracer) {
             let contents: &T = &*self;
             tracer.add_target(contents);
         }
     }
+    impl<T: Trace + ?Sized> Trace for std::sync::Weak<T> {}
     impl<T: Trace + ?Sized> Trace for std::cell::RefCell<T> {
         fn trace(&self, tracer: &mut Tracer) {
             tracer.add_target(&*self.borrow());
@@ -241,7 +269,18 @@ mod trace_impls {
             }
         }
     }
+    impl<T, U> Trace for std::io::Chain<T, U> {}
+    impl<T> Trace for std::io::Cursor<T> {}
+    impl<T> Trace for std::io::Take<T> {}
+    impl<T> Trace for std::num::Wrapping<T> {}
 
+    // Things chosen not to implement
+    // std::sync::Mutex - Not sure what behavior I want
+    // std::sync::RwLock - Not sure what behavior I want
+    // std::iter::* - Too many structs
+    // Iterators in general - Too lazy to do all them
+    // std::ops::Range* - Thats a lot of structs
+    // std::any::Any - Not sure how to do this one
 }
 
 #[cfg(test)]
