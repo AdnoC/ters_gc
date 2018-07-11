@@ -4,7 +4,6 @@
 //!
 //!
 //! *TODO: CHECK THAT ALL LINKS ARE VALID*
-//! *TODO: Ensure Proxy is !Send*
 //! *TODO: Document UB when deref Gc in destructor*
 //!
 //! TODO: Mention that Gc is basically improved Rc
