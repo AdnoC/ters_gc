@@ -280,18 +280,15 @@ const _SAN: &str = "San Diego";
 
 #[test]
 fn dijkstra_is_cool() {
-    let body = |mut proxy: Proxy| {
-        let mut graph = Graph::new();
-
-        initialize_graph(&mut proxy, &mut graph);
-        test_first_path(&graph);
-        secede_texas(&mut proxy, &mut graph);
-        test_second_path(&graph);
-    };
 
     let mut col = Collector::new();
+    let mut proxy = col.proxy();
+    let mut graph = Graph::new();
 
-    col.run_with_gc(body);
+    initialize_graph(&mut proxy, &mut graph);
+    test_first_path(&graph);
+    secede_texas(&mut proxy, &mut graph);
+    test_second_path(&graph);
 
     fn initialize_graph<'a>(proxy: &mut Proxy<'a>, graph: &mut Graph<'a>) {
         let dtw = graph.new_node(proxy, DTW);
