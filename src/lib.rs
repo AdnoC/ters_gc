@@ -7,6 +7,8 @@
 //! *TODO: Remove all calls to `run_with_gc`. Replace with just getting proxy*
 //! *TODO: Fix all docs about `run_with_gc`*
 //! *TODO: impl Drop for Proxy - Have it clear the allocator map*
+//! *TODO: Change crate doc test to no longer use `run_with_gc`*
+//! *TODO: Change README test to no longer use `run_with_gc`*
 //!
 //! A mark-and-sweep garbage collecting allocator.
 //! Based loosely on orangeduck's [`Tiny Garbage Collector`].
@@ -689,36 +691,34 @@ mod tests {
     fn collect_while_in_stack_after_drop() {
         use std::mem::drop;
         let mut col = Collector::new();
-        col.run_with_gc(|mut proxy| {
-            for i in 0..60 {
-                let num = proxy.store(i);
-                assert_eq!(*num, i);
-            }
-            let num = proxy.store(-1);
-            assert_eq!(*num, -1);
-            assert!(proxy.num_tracked() > 0);
-            proxy.run();
-            assert!(proxy.num_tracked() > 0);
-            drop(num);
-            proxy.run();
-            assert_eq!(0, proxy.num_tracked());
-        });
+        let mut proxy = col.proxy();
+        
+        for i in 0..60 {
+            let num = proxy.store(i);
+            assert_eq!(*num, i);
+        }
+        let num = proxy.store(-1);
+        assert_eq!(*num, -1);
+        assert!(proxy.num_tracked() > 0);
+        proxy.run();
+        assert!(proxy.num_tracked() > 0);
+        drop(num);
+        proxy.run();
+        assert_eq!(0, proxy.num_tracked());
     }
 
     #[test]
     fn msc_allocs_sanity_check() {
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            {
-                let _num1 = proxy.store(42);
-                assert_eq!(num_tracked_objs(&proxy), 1);
-                proxy.run();
-                assert_eq!(num_tracked_objs(&proxy), 1);
-            }
+        let mut proxy = col.proxy();
+        {
+            let _num1 = proxy.store(42);
+            assert_eq!(num_tracked_objs(&proxy), 1);
             proxy.run();
-            assert_eq!(num_tracked_objs(&proxy), 0);
-        };
-        col.run_with_gc(body);
+            assert_eq!(num_tracked_objs(&proxy), 1);
+        }
+        proxy.run();
+        assert_eq!(num_tracked_objs(&proxy), 0);
     }
 
     #[test]
@@ -729,28 +729,27 @@ mod tests {
         let num_wasted = threshold - num_useful;
         assert!(threshold > num_useful);
 
-        let body = |mut proxy: Proxy| {
-            let mut head = LinkedList { next: None };
-            macro_rules! prepend_ll {
-                () => {{
-                    let boxed = proxy.store(head);
-                    LinkedList { next: Some(boxed) }
-                }};
-            }
-            for _ in 0..num_useful {
-                head = prepend_ll!(); //(&mut proxy, head);
-            }
-            {
-                for _ in 0..num_wasted {
-                    proxy.store(22);
-                }
-            }
-            assert_eq!(num_tracked_objs(&proxy), threshold);
+        let mut proxy = col.proxy();
+
+        let mut head = LinkedList { next: None };
+        macro_rules! prepend_ll {
+            () => {{
+                let boxed = proxy.store(head);
+                LinkedList { next: Some(boxed) }
+            }};
+        }
+        for _ in 0..num_useful {
             head = prepend_ll!(); //(&mut proxy, head);
-            assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
-            assert!(head.next.is_some());
-        };
-        col.run_with_gc(body);
+        }
+        {
+            for _ in 0..num_wasted {
+                proxy.store(22);
+            }
+        }
+        assert_eq!(num_tracked_objs(&proxy), threshold);
+        head = prepend_ll!(); //(&mut proxy, head);
+        assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
+        assert!(head.next.is_some());
     }
 
     #[test]
@@ -761,28 +760,27 @@ mod tests {
         let num_wasted = threshold - num_useful;
         assert!(threshold > num_useful);
 
-        let body = |mut proxy: Proxy| {
-            let mut head = LinkedList { next: None };
-            macro_rules! prepend_ll {
-                () => {{
-                    let boxed = proxy.store(head);
-                    LinkedList { next: Some(boxed) }
-                }};
+        let mut proxy = col.proxy();
+
+        let mut head = LinkedList { next: None };
+        macro_rules! prepend_ll {
+            () => {{
+                let boxed = proxy.store(head);
+                LinkedList { next: Some(boxed) }
+            }};
+        }
+        for _ in 0..num_useful {
+            head = prepend_ll!(); //(&mut proxy, head);
+        }
+        {
+            for _ in 0..num_wasted {
+                proxy.store(22);
             }
-            for _ in 0..num_useful {
-                head = prepend_ll!(); //(&mut proxy, head);
-            }
-            {
-                for _ in 0..num_wasted {
-                    proxy.store(22);
-                }
-            }
-            assert_eq!(num_tracked_objs(&proxy), threshold);
-            proxy.pause();
-            prepend_ll!(); //(&mut proxy, head);
-            assert_eq!(num_tracked_objs(&proxy), threshold + 1);
-        };
-        col.run_with_gc(body);
+        }
+        assert_eq!(num_tracked_objs(&proxy), threshold);
+        proxy.pause();
+        prepend_ll!(); //(&mut proxy, head);
+        assert_eq!(num_tracked_objs(&proxy), threshold + 1);
     }
 
     #[test]
@@ -793,34 +791,25 @@ mod tests {
         let num_wasted = threshold - num_useful;
         assert!(threshold > num_useful);
 
-        let body = |mut proxy: Proxy| {
-            let mut head = LinkedList { next: None };
-            macro_rules! prepend_ll {
-                () => {{
-                    let boxed = proxy.store(head);
-                    LinkedList { next: Some(boxed) }
-                }};
-            }
-            for _ in 0..num_useful {
-                head = prepend_ll!(); //(&mut proxy, head);
-            }
-            for _ in 0..num_wasted {
-                proxy.store(22);
-            }
-            assert_eq!(num_tracked_objs(&proxy), threshold);
-            proxy.pause();
-            proxy.resume();
-            prepend_ll!(); //(&mut proxy, head);
-            assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
-        };
-        col.run_with_gc(body);
-    }
-
-    #[test]
-    fn returning_a_value_works() {
-        let mut col = Collector::new();
-        let val = col.run_with_gc(|_proxy| 42);
-        assert_eq!(val, 42);
+        let mut proxy = col.proxy();
+        let mut head = LinkedList { next: None };
+        macro_rules! prepend_ll {
+            () => {{
+                let boxed = proxy.store(head);
+                LinkedList { next: Some(boxed) }
+            }};
+        }
+        for _ in 0..num_useful {
+            head = prepend_ll!(); //(&mut proxy, head);
+        }
+        for _ in 0..num_wasted {
+            proxy.store(22);
+        }
+        assert_eq!(num_tracked_objs(&proxy), threshold);
+        proxy.pause();
+        proxy.resume();
+        prepend_ll!(); //(&mut proxy, head);
+        assert_eq!(num_tracked_objs(&proxy), num_useful + 1);
     }
 
     #[test]
@@ -835,21 +824,18 @@ mod tests {
             }
         }
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            {
-                let ptr = proxy.store(SelfRef {
-                    self_ptr: RefCell::new(None),
-                });
-                *ptr.self_ptr.borrow_mut() = Some(ptr.clone());
-
-                proxy.run();
-            }
+        let mut proxy = col.proxy();
+        {
+            let ptr = proxy.store(SelfRef {
+                self_ptr: RefCell::new(None),
+            });
+            *ptr.self_ptr.borrow_mut() = Some(ptr.clone());
 
             proxy.run();
-            assert_eq!(num_tracked_objs(&proxy), 0);
-        };
+        }
 
-        col.run_with_gc(body);
+        proxy.run();
+        assert_eq!(num_tracked_objs(&proxy), 0);
     }
 
     #[test]
@@ -863,21 +849,19 @@ mod tests {
             }
         }
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            let _root = {
-                let leaf = proxy.store(List { ptr: None });
-                let root = proxy.store(List { ptr: Some(leaf) });
-                Box::new(root)
-            };
-
-            proxy.run();
-            assert_eq!(num_tracked_objs(&proxy), 2);
+        let mut proxy = col.proxy();
+        let _root = {
+            let leaf = proxy.store(List { ptr: None });
+            let root = proxy.store(List { ptr: Some(leaf) });
+            Box::new(root)
         };
 
-        col.run_with_gc(body);
+        proxy.run();
+        assert_eq!(num_tracked_objs(&proxy), 2);
     }
 
     #[test]
+    // A.K.A. Crate doc test
     fn min_cycle() {
         use std::cell::RefCell;
 
@@ -895,26 +879,21 @@ mod tests {
         // Make a new collector to keep the gc state
         let mut col = Collector::new();
 
-        // Find out the meaning of life, and allow use of the gc while doing so
-        let meaning = col.run_with_gc(|mut proxy| {
-            // Do some computations that are best expressed with a cyclic data structure
-            {
-                let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
-                let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
-                *thing1.0.borrow_mut() = Some(thing2.clone());
-            }
+        // Make a Proxy to access the API
+        let mut proxy = col.proxy();
 
-            // Collect garbage
-            proxy.run();
+        // Do some computations that are best expressed with a cyclic data structure
+        {
+            let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
+            let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+            *thing1.0.borrow_mut() = Some(thing2.clone());
+        }
 
-            // And we've successfully cleaned up the unused cyclic data
-            assert_eq!(proxy.num_tracked(), 0);
+        // Collect garbage
+        proxy.run();
 
-            // Return
-            42
-        });
-
-        assert_eq!(meaning, 42);
+        // And we've successfully cleaned up the unused cyclic data
+        assert_eq!(proxy.num_tracked(), 0);
     }
 
     #[test]
