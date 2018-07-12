@@ -44,6 +44,12 @@ impl<'a> trace::Trace for CyclicStruct<'a> {
     }
 }
 
+impl<'a> Drop for CyclicStruct<'a> {
+    fn drop(&mut self) {
+        println!("dropping CyclicStruct");
+    }
+}
+
 fn main() {
     // Make a new collector to keep the gc state
     let mut col = Collector::new();
@@ -58,7 +64,7 @@ fn main() {
         } // They are out of scope and no longer reachable here
 
         // Collect garbage
-        proxy.run();
+        proxy.run(); // Prints "dropping CyclicStruct" twick
 
         // And we've successfully cleaned up the unused cyclic data
         assert_eq!(proxy.num_tracked(), 0);
