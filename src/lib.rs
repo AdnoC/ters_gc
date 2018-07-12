@@ -107,7 +107,7 @@
 //! [`Gc`]s for an object that the client does not have direct access to.
 //! So, if the total number of [`Gc`]s is greater than the number of found [`Gc`]s,
 //! there has to be some [`Gc`]s outside of the gc heap. Either on the stack
-//! of in the heap through a [`Box`] or something. TODO: Finish  paragraph
+//! or in the heap (such as if it was stored in a [`Box`] or [`Vec`]).
 //!
 //! # Limitations
 //!
@@ -163,6 +163,7 @@
 //! [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
 //! [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
+//! [`Vec`]: https://doc.rust-lang.org/std/vec/struct.Vec.html
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 //! [`Tiny Garbage Collector`]: http://tinygc.sourceforge.net/
 
