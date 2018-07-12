@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 description = "Create garbage colleced pointers"
 keywords = ["arena", "gc"]
-
+categories = ["Memory management"]
 
 [dev-dependencies.compiletest_rs]
 version = "0.3.11"
