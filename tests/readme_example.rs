@@ -24,24 +24,19 @@ fn main() {
     // Make a new collector to keep the gc state
     let mut col = Collector::new();
 
-    // Find out the meaning of life, and allow use of the gc while doing so
-    let meaning_of_life = col.run_with_gc(|mut proxy| {
-        // Do some computations that are best expressed with a cyclic data structure
-        {
-            let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
-            let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
-            *thing1.0.borrow_mut() = Some(thing2.clone());
-        } // They are out of scope and no longer reachable here
+    // Make a Proxy to access the API
+    let mut proxy = col.proxy();
 
-        // Collect garbage
-        proxy.run(); // Prints "dropping CyclicStruct" twick
+    // Do some computations that are best expressed with a cyclic data structure
+    {
+        let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
+        let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+        *thing1.0.borrow_mut() = Some(thing2.clone());
+    } // They are out of scope and no longer reachable here
 
-        // And we've successfully cleaned up the unused cyclic data
-        assert_eq!(proxy.num_tracked(), 0);
+    // Collect garbage
+    proxy.run(); // Prints "dropping CyclicStruct" twick
 
-        // Return
-        42
-    });
-
-    assert_eq!(meaning_of_life, 42);
+    // And we've successfully cleaned up the unused cyclic data
+    assert_eq!(proxy.num_tracked(), 0);
 }

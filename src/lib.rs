@@ -7,7 +7,6 @@
 //! *TODO: Remove all calls to `run_with_gc`. Replace with just getting proxy*
 //! *TODO: Fix all docs about `run_with_gc`*
 //! *TODO: Change crate doc test to no longer use `run_with_gc`*
-//! *TODO: Change README test to no longer use `run_with_gc`*
 //!
 //! A mark-and-sweep garbage collecting allocator.
 //! Based loosely on orangeduck's [`Tiny Garbage Collector`].
