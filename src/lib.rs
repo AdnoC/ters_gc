@@ -287,6 +287,8 @@ impl Collector {
     /// Run the passed function, providing it access to gc operations via a
     /// [`Proxy`](struct.Proxy.html).
     ///
+    /// Destroys all objects in the gc heap before returning.
+    ///
     /// # Examples
     ///
     /// ```
@@ -299,8 +301,9 @@ impl Collector {
     ///
     /// ```
     pub fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
-        let proxy = self.proxy();
-        func(proxy)
+        let result = func(self.proxy());
+        self.allocator.items.clear();
+        result
     }
 
     fn alloc<T: Trace>(&mut self, val: T) -> NonNull<GcBox<T>> {
