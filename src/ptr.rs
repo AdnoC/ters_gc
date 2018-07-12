@@ -197,6 +197,7 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 ///
 /// let mut col = Collector::new();
 /// let mut proxy = col.proxy();
+///
 /// let _gc_ptr = proxy.store(0);
 /// ```
 ///
@@ -503,8 +504,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///
     /// let gdp_clone = zambia_2016_gdp.clone();
     ///
-    /// let gdp_gc_again = Gc::try_unwrap(zambia_2016_gdp, &mut proxy)
-    ///     .unwrap_err();
+    /// let gdp_gc_again = Gc::try_unwrap(zambia_2016_gdp, &mut proxy).unwrap_err();
     ///
     /// drop(gdp_clone);
     ///
