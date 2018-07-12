@@ -59,6 +59,7 @@
 //!
 //! let mut col = Collector::new();
 //! let mut proxy = col.proxy();
+//!
 //! let bct_stack = BigComplexThing {
 //!     name: TracePrinter(proxy.store(OsString::new())),
 //!     description: "default description".to_string(),
@@ -111,6 +112,7 @@
 //!
 //! let mut col = Collector::new();
 //! let mut proxy = col.proxy();
+//!
 //! proxy.store(I32Newtype(22));
 //! ```
 //!
