@@ -1,7 +1,8 @@
 [package]
 name = "ters_gc"
 version = "0.1.0"
-authors = ["AdnoC <adam.r.cutler@gmail.com>"]
+authors = ["Adam Cutler <adam.r.cutler@gmail.com>"]
+license = "MIT OR Apache-2.0"
 
 
 [dependencies]
