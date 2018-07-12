@@ -255,7 +255,7 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 /// See [`Proxy`] for gc usage details.
 ///
 /// [`Proxy`]: struct.Proxy.html
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct Collector {
     allocator: Allocator,
     collection_threshold: usize,
@@ -470,7 +470,7 @@ impl Collector {
 /// Allows for allocation and collection.
 ///
 /// Can also be used to control collection.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Proxy<'arena> {
     collector: &'arena mut Collector,
 }

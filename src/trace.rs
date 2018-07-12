@@ -143,11 +143,11 @@ pub trait Trace {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct TraceDest(pub NonNull<UntypedGcBox>);
 
 /// Destination for trace information.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Tracer {
     targets: Vec<TraceDest>,
 }

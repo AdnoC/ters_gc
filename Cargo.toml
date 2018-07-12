@@ -2,7 +2,10 @@
 name = "ters_gc"
 version = "0.1.0"
 authors = ["Adam Cutler <adam.r.cutler@gmail.com>"]
+# repository = <PUT HERE ONCE ON GITHUM>
 license = "MIT OR Apache-2.0"
+readme = "README.md"
+description = "Create garbage colleced pointers"
 
 
 [dependencies]

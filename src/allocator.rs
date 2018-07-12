@@ -7,7 +7,7 @@ use UntypedGcBox;
 use {AsTyped, AsUntyped};
 
 /// Type-erased allocation info
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct AllocInfo {
     pub ptr: NonNull<UntypedGcBox>,
     // unsafe is because it must be called with accompanying pointer
@@ -75,7 +75,7 @@ impl Drop for AllocInfo {
 }
 
 /// Handles allocation and freeing of objects.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub(crate) struct Allocator {
     pub items: HashMap<*mut UntypedGcBox, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func
