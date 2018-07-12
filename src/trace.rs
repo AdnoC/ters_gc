@@ -129,10 +129,13 @@ use UntypedGcBox;
 // Can act funny if you have Sp<Gc<T>> where Sp is a smart pointer that
 // doesn't impl Trace.
 /// Trait all types that are stored in the gc heap must implement.
+///
+/// A correct implementation calls [`Tracer::add_target`] on all members that
+/// can contain a Gc.
+///
+/// [`Tracer::add_target`]: struct.Tracer.html#method.add_target
 pub trait Trace {
-    /// Trace reachability information to the tracer.
-    ///
-    /// Should be called on all types that contain a [`Gc`] pointer.
+    /// Tell the tracer about [`Gc`] pointers
     ///
     /// [`Gc`]: ../ptr/struct.Gc.html
     fn trace(&self, _tracer: &mut Tracer) {

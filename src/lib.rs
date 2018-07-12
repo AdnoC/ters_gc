@@ -238,9 +238,9 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 }
 
 /// State container for grabage collection.
-/// Access to the API goes through [`Proxy`].
+/// Access to the API must go through a [`Proxy`].
 ///
-/// See [`Proxy`] for gc use details.
+/// See [`Proxy`] for gc usage details.
 ///
 /// [`Proxy`]: struct.Proxy.html
 pub struct Collector {

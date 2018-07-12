@@ -6,7 +6,11 @@
 //! outside the gc heap, the pointed-to value will be destroyed when collection
 //! is run.
 //!
+//! [`Weak`] pointers do not contribute to ownership of an object, but can be
+//! turned into owning [`Gc`] pointers.
+//!
 //! [`Gc`]: struct.Gc.html
+//! [`Weak`]: struct.Weak.html
 //! [`clone`]: https://doc.rust-lang.org/std/clone/trait.Clone.html#tymethod.clone
 
 use std::cell::Cell;
@@ -160,8 +164,8 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// The API is meant to mirror that of [`Rc`].
 ///
 /// The type [`Gc<'a, T>`][`Gc`] provides shared ownership of a value of type `T`
-/// allocated in the gc heap. Invoking [`clone`] on [`Gc`] produces a new pointer
-/// to the same value in the heap. When no [`Gc`] pointers are reachable from
+/// allocated in the gc heap. Invoking [`clone`] on `Gc` produces a new pointer
+/// to the same value in the heap. When no `Gc` pointers are reachable from
 /// outside the gc heap, the pointed-to value will be destroyed when collection
 /// is run.
 ///
@@ -175,10 +179,10 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// [`Gc::get`][get]. Unless otherwise mentioned, using most methods inside a destructor
 /// can result in undefined behavior.
 ///
-/// [`Gc`] does not generally allow access to mutable references to the inner value.
-/// Put a [`Cell`] or [`RefCell`] inside the [`Gc`] if you need mutability.
+/// `Gc` does not generally allow access to mutable references to the inner value.
+/// Put a [`Cell`] or [`RefCell`] inside the `Gc` if you need mutability.
 ///
-/// A cycle between [`Gc`] pointers will not leak memory. Once all the objects
+/// A cycle between `Gc` pointers will not leak memory. Once all the objects
 /// in the cycle are unreachable they will be reclaimed the next time the
 /// collector is run.
 ///
@@ -186,7 +190,7 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 ///
 /// # Examples
 ///
-/// Creating a [`Gc`]:
+/// Creating a `Gc`:
 ///
 /// ```
 /// use ters_gc::Collector;
@@ -197,6 +201,7 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// ```
 ///
 /// [`Proxy::store`]: ../struct.Proxy.html#method.store
+/// [`Gc`]: struct.Gc.html
 /// [get]: #method.get
 /// [is_alive]: #method.is_alive
 /// [downgrade]: #method.downgrade
