@@ -176,8 +176,8 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// Dereferencing a `Gc` inside a destructor ([`drop`]) can lead
 /// to undefined behavior. If you must do so, either check that the `Gc` is still
 /// alive with [`Gc::is_alive`][is_alive] first, or use dereference it using
-/// [`Gc::get`][get]. Unless otherwise mentioned, using most methods inside a destructor
-/// can result in undefined behavior.
+/// [`Gc::get`][get]. The safety of a method's use inside a destructor is noted
+/// in its doc comment.
 ///
 /// `Gc` does not generally allow access to mutable references to the inner value.
 /// Put a [`Cell`] or [`RefCell`] inside the `Gc` if you need mutability.
