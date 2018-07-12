@@ -3,7 +3,7 @@
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
 //! A mark-and-sweep garbage collecting allocator.
-//! Based loosely on the [`Tiny Garbage Collector`].
+//! Based loosely on orangeduck's [`Tiny Garbage Collector`].
 //!
 //! Provides the [`Gc`] type, essentially an [`Rc`] that can handle cycles.
 //!
@@ -184,7 +184,7 @@
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
 //! [`Vec`]: https://doc.rust-lang.org/std/vec/struct.Vec.html
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
-//! [`Tiny Garbage Collector`]: http://tinygc.sourceforge.net/
+//! [`Tiny Garbage Collector`]: https://github.com/orangeduck/tgc
 
 pub(crate) enum UntypedGcBox {}
 
