@@ -6,6 +6,7 @@ authors = ["Adam Cutler <adam.r.cutler@gmail.com>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 description = "Create garbage colleced pointers"
+keywords = ["arena", "gc"]
 
 
 [dev-dependencies]
