@@ -77,6 +77,38 @@
 //!
 //! [`Trace`] is implemented for many of the types in `std`.
 //!
+//! # Soundness
+//! 
+//! Assuming the absence of bugs, use of this library should not cause any
+//! use-after-free errors (aside from the special case of destructors). [`Gc`]
+//! essentially acts like an [`Rc`] that knows something about all other created
+//! [`Rc`]s. Until you drop all the [`Gc`]s to an object, those [`Gc`]s won't be
+//! invalidated by collection. Just like with [`Rc`], your pointers stay valid
+//! until you no longer use them.
+//! 
+//! The most likely result of a user error (e.g. not telling the [`Tracer`] about all
+//! your [`Gc`] in your [`Trace`] impl or leaking a [`Gc`] pointer)
+//! is that the memory is leaked.
+//! 
+//! # Garbage Collection Algorithm
+//! 
+//! Collection is done in two phases. The mark phase determines which objects are
+//! still reachable. The sweep phase frees all the objects that weren't marked
+//! reachable during the mark phase.
+//! 
+//! The mark phase is also split into two steps. First the collector visits every
+//! tracked object and for each object it finds what other objects it has pointers
+//! to. At the end of this part every tracked object has a count - the number
+//! of pointers to that object that we found.
+//! 
+//! Now the collector determines which objects the client has direct pointers to.
+//! Every [`Gc`] has a reference count of the number of [`Gc`]s that
+//! point to the object. From the previous step, we also know the number of
+//! [`Gc`]s for an object that the client does not have direct access to.
+//! So, if the total number of [`Gc`]s is greater than the number of found [`Gc`]s,
+//! there has to be some [`Gc`]s outside of the gc heap. Either on the stack
+//! of in the heap through a [`Box`] or something. TODO: Finish  paragraph
+//!
 //! # Limitations
 //!
 //! ## You cannot dereference a [`Gc`] inside of a [`Drop::drop`] implementation
@@ -122,13 +154,14 @@
 //! [`Weak`]: ptr/struct.Weak.html
 //! [`Safe`]: ptr/struct.Safe.html
 //! [`Trace`]: trace/trait.Trace.html
+//! [`Tracer`]: trace/struct.Tracer.html
 //! [`Proxy::run`]: struct.Proxy.html#method.run
 //! [`Gc::is_alive`]: ptr/struct.Gc.html#method.is_alive
 //! [`Gc::get`]: ptr/struct.Gc.html#method.get
 //! [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
 //! [`mem::forget`]: https://doc.rust-lang.org/std/mem/fn.forget.html
-//! [`Sync`]
-//! [`Send`]
+//! [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
+//! [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 //! [`Tiny Garbage Collector`]: http://tinygc.sourceforge.net/
