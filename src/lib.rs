@@ -106,8 +106,10 @@
 //! point to the object. From the previous step, we also know the number of
 //! [`Gc`]s for an object that the client does not have direct access to.
 //! So, if the total number of [`Gc`]s is greater than the number of found [`Gc`]s,
-//! there has to be some [`Gc`]s outside of the gc heap. Either on the stack
-//! or in the heap (such as if it was stored in a [`Box`] or [`Vec`]).
+//! at least one [`Gc`] to the object must exist outside of the gc heap.
+//! That [`Gc`] must be either on the stack or in the heap
+//! (such as if it was stored in a [`Box`] or [`Vec`]). Regardless, it should
+//! be TODO finish
 //!
 //! # Limitations
 //!
