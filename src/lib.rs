@@ -2,8 +2,6 @@
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
-//! *TODO: Rename `Proxy`?*
-//!
 //! A mark-and-sweep garbage collecting allocator.
 //! Based loosely on orangeduck's [`Tiny Garbage Collector`].
 //!
