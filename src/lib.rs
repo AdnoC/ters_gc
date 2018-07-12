@@ -192,6 +192,9 @@
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 //! [`Tiny Garbage Collector`]: https://github.com/orangeduck/tgc
 
+// Keep the version number in sync with crate version
+#![doc(html_root_url = "https://docs.rs/ters_gc/0.1.0")]
+
 #![deny(
     missing_docs,
     missing_debug_implementations,

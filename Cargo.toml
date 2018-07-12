@@ -14,5 +14,6 @@ version = "0.3.11"
 features = ["stable"]
 
 [dev-dependencies]
-smallvec = "0.6.2"
-priority-queue = "0.5.1"
+smallvec = "0.6.2" # For dijkstra test
+priority-queue = "0.5.1" # For dijkstra test
+version-sync = "0.5"
