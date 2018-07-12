@@ -930,4 +930,15 @@ mod tests {
         let factor2 = proxy.collector.sweep_factor;
         assert_eq!(factor2, 0.9);
     }
+//    /// # use std::error::Error;
+//    /// #
+//    /// # fn try_main() -> Result<(), Box<Error>> {
+//    /// <PUT CODE HERE>
+//    /// #
+//    /// #     Ok(())
+//    /// # }
+//    /// #
+//    /// # fn main() {
+//    /// #     try_main().unwrap();
+//    /// # }
 }

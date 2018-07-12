@@ -250,6 +250,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// Allows you to check in destructors that the data a `Gc` point to has
     /// not already been reclaimed.
     ///
+    /// # Safety
+    ///
     /// Safe to use in destructors.
     ///
     /// # Examples
@@ -271,10 +273,12 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// Safely obtain a reference to the inner value.
     ///
     /// Returns [`None`] if the pointed-to object has already been freed
-    /// ([`is_alive`] is `false`)
+    /// ([`is_alive`] returns `false`)
     ///
     /// Can be used in destructors to obtain a reference to the pointed-to object
     /// if it is still valid.
+    ///
+    /// # Safety
     ///
     /// Safe to use in destructors.
     ///
@@ -311,6 +315,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// object or it is not safe to mutate a shared value.
     ///
     /// See also [`make_mut`], which will [`clone`] the inner value when it's shared.
+    ///
+    /// # Safety
     ///
     /// Safe to use in destructors.
     ///
@@ -383,6 +389,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// Returns `true` if the two `Gc`s point to the same value
     /// (not just values that compare as equal).
     ///
+    /// # Safety
+    ///
     /// Safe to use in destructors.
     ///
     /// # Examples
@@ -406,6 +414,10 @@ impl<'a, T: 'a> Gc<'a, T> {
 
     /// Get the number of strong (`Gc`) pointers to this value.
     ///
+    /// # Safety
+    ///
+    /// **Not** safe to use in destructors.
+    ///
     /// # Examples
     ///
     /// ```
@@ -424,6 +436,10 @@ impl<'a, T: 'a> Gc<'a, T> {
     }
 
     /// Gets the number of [`Weak`] pointers to this value.
+    ///
+    /// # Safety
+    ///
+    /// **Not** safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -445,6 +461,8 @@ impl<'a, T: 'a> Gc<'a, T> {
     }
 
     /// Creates a new [`Weak`] pointer to this value.
+    ///
+    /// # Safety
     ///
     /// Safe to use in destructors.
     ///
@@ -492,6 +510,10 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///
     /// Requires access to the [`Proxy`] in order to stop tracking the object.
     ///
+    /// # Safety
+    ///
+    /// Safe to use in destructors.
+    ///
     /// # Examples
     ///
     /// ```
@@ -530,6 +552,10 @@ impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
     /// Requires access to the [`Proxy`] in case a new `Gc` has to be created.
     ///
     /// See also [`get_mut`], which will fail rather than cloning.
+    ///
+    /// # Safety
+    ///
+    /// Safe to use in destructors (due to the panic).
     ///
     /// # Panics
     ///
@@ -589,6 +615,8 @@ impl<'a, T: 'a> Drop for Gc<'a, T> {
     /// The inner value is only `drop`ped when the object is reclaimed when
     /// the gc is run.
     ///
+    /// # Safety
+    ///
     /// Safe to use in destructors.
     ///
     /// # Examples
@@ -641,7 +669,9 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
     /// This creates another pointer to the same inner value, increasing the
     /// strong reference count.
     ///
-    /// Safe to use in destructors.
+    /// # Safety
+    ///
+    /// Safe to use in destructors (due to the panic).
     ///
     /// # Panics
     ///
@@ -684,6 +714,8 @@ mod gc_impls {
 
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Gc<'a, T> {
         /// Formats the value using the given formatter.
+        ///
+        /// # Safety
         ///
         /// Safe to use in destructors.
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
