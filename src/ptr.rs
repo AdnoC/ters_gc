@@ -981,24 +981,21 @@ mod weak_impls {
 mod tests {
     use super::*;
     use Collector;
-    use Proxy;
 
     #[test]
     fn strong_count_works() {
         use std::mem::drop;
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            fn get_ref_num<'a, T>(gc: &Gc<'a, T>) -> usize {
-                Gc::get_gc_box(gc).refs.clone().take()
-            }
-            let num = proxy.store(42);
-            assert_eq!(get_ref_num(&num), 1);
-            let num2 = num.clone();
-            assert_eq!(get_ref_num(&num), 2);
-            drop(num);
-            assert_eq!(get_ref_num(&num2), 1);
-        };
-        col.run_with_gc(body);
+        let mut proxy = col.proxy();
+        fn get_ref_num<'a, T>(gc: &Gc<'a, T>) -> usize {
+            Gc::get_gc_box(gc).refs.clone().take()
+        }
+        let num = proxy.store(42);
+        assert_eq!(get_ref_num(&num), 1);
+        let num2 = num.clone();
+        assert_eq!(get_ref_num(&num), 2);
+        drop(num);
+        assert_eq!(get_ref_num(&num2), 1);
     }
 
     #[test]
@@ -1009,67 +1006,57 @@ mod tests {
         impl<T> Trace for NoTrace<T> {}
 
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            let num = proxy.store(NoTrace(Cell::new(0)));
-            let num_weak = Gc::downgrade(&num);
-            {
-                let num_ref = num_weak.upgrade().unwrap();
-                num_ref.0.set(num_ref.0.get() + 1);
-            }
-            let num = num_weak.upgrade().unwrap();
-            assert_eq!(num.0.get(), 1);
-        };
-
-        col.run_with_gc(body);
+        let mut proxy = col.proxy();
+        let num = proxy.store(NoTrace(Cell::new(0)));
+        let num_weak = Gc::downgrade(&num);
+        {
+            let num_ref = num_weak.upgrade().unwrap();
+            num_ref.0.set(num_ref.0.get() + 1);
+        }
+        let num = num_weak.upgrade().unwrap();
+        assert_eq!(num.0.get(), 1);
     }
 
     #[test]
     fn weak_knows_when_dangling() {
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            let num_weak = {
-                let num = proxy.store(0);
-                let num_weak = Gc::downgrade(&num);
-                num_weak
-            };
-            proxy.run();
-            assert_eq!(proxy.num_tracked(), 0);
-            assert!(!num_weak.is_alive());
+        let mut proxy = col.proxy();
+        let num_weak = {
+            let num = proxy.store(0);
+            let num_weak = Gc::downgrade(&num);
+            num_weak
         };
-
-        col.run_with_gc(body);
+        proxy.run();
+        assert_eq!(proxy.num_tracked(), 0);
+        assert!(!num_weak.is_alive());
     }
 
     #[test]
     fn gc_knows_when_dangling() {
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            let num_safe = {
-                let num = proxy.store(0);
-                Gc::get_gc_box(&num).decr_ref();
-                num
-            };
-
-            proxy.run();
-            assert_eq!(proxy.num_tracked(), 0);
-            assert!(Gc::get(&num_safe).is_none());
+        let mut proxy = col.proxy();
+        let num_safe = {
+            let num = proxy.store(0);
+            Gc::get_gc_box(&num).decr_ref();
+            num
         };
 
-        col.run_with_gc(body);
+        proxy.run();
+        assert_eq!(proxy.num_tracked(), 0);
+        assert!(Gc::get(&num_safe).is_none());
     }
 
     #[test]
     #[should_panic]
     fn panic_when_deref_dangling_safe() {
         let mut col = Collector::new();
-        col.run_with_gc(|mut proxy| {
-            let num = proxy.store(0);
-            Gc::get_gc_box(&num).decr_ref();
+        let mut proxy = col.proxy();
+        let num = proxy.store(0);
+        Gc::get_gc_box(&num).decr_ref();
 
-            proxy.run();
-            assert_eq!(proxy.num_tracked(), 0);
-            *num
-        });
+        proxy.run();
+        assert_eq!(proxy.num_tracked(), 0);
+        let _ = *num;
     }
 
     // #[test]
@@ -1102,223 +1089,220 @@ mod tests {
 
     #[test]
     fn std_impls_gc() {
+        use std::borrow::Borrow;
+        use std::cmp::Ordering;
+        use std::hash::{Hash, Hasher};
+
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            use std::borrow::Borrow;
-            use std::cmp::Ordering;
-            use std::hash::{Hash, Hasher};
-            fn calculate_hash<H: Hash>(h: &H) -> u64 {
-                use std::collections::hash_map::DefaultHasher;
-                let mut s = DefaultHasher::new();
-                h.hash(&mut s);
-                s.finish()
-            }
-            fn requires_eq<E: Eq>(_e: &E) {}
-            let one = proxy.store(1);
-            let other_one = proxy.store(1);
-            let two = proxy.store(2);
-            let other_two = proxy.store(2);
+        let mut proxy = col.proxy();
 
-            // Deref
-            assert_eq!(1, *one);
-            // Clone
-            assert_eq!(1, *Gc::get(&one).unwrap());
-            // Debug
-            let one_debug = format!("{:?}", one);
-            assert!(one_debug.contains("Gc"));
-            assert!(one_debug.contains(&format!("{:?}", 1)));
-            // AsRef
-            assert_eq!(1, *one.as_ref());
-            // Display
-            assert_eq!(format!("{}", 1), format!("{}", one));
-            // Pointer
-            assert_eq!(format!("{:p}", one), format!("{:p}", one.clone()));
-            // Hash
-            assert_eq!(calculate_hash(&1), calculate_hash(&one));
-            // Borrow
-            assert_eq!(1, *one.borrow());
-            // PartialEq
-            assert_eq!(one, other_one);
-            assert!(one != two);
-            // Eq
-            requires_eq(&one);
-            // PartialOrd
-            assert_eq!(Some(Ordering::Less), one.partial_cmp(&two));
-            assert_eq!(Some(Ordering::Equal), one.partial_cmp(&other_one));
-            assert_eq!(Some(Ordering::Greater), two.partial_cmp(&one));
-            assert!(one < two);
-            assert!(one <= two);
-            assert!(one <= other_one);
-            assert!(two > one);
-            assert!(two >= one);
-            assert!(two >= other_two);
-            // Ord
-            assert_eq!(Ordering::Less, one.cmp(&two));
-            assert_eq!(Ordering::Equal, one.cmp(&other_one));
-            assert_eq!(Ordering::Greater, two.cmp(&one));
-        };
+        fn calculate_hash<H: Hash>(h: &H) -> u64 {
+            use std::collections::hash_map::DefaultHasher;
+            let mut s = DefaultHasher::new();
+            h.hash(&mut s);
+            s.finish()
+        }
+        fn requires_eq<E: Eq>(_e: &E) {}
+        let one = proxy.store(1);
+        let other_one = proxy.store(1);
+        let two = proxy.store(2);
+        let other_two = proxy.store(2);
 
-        col.run_with_gc(body);
+        // Deref
+        assert_eq!(1, *one);
+        // Clone
+        assert_eq!(1, *Gc::get(&one).unwrap());
+        // Debug
+        let one_debug = format!("{:?}", one);
+        assert!(one_debug.contains("Gc"));
+        assert!(one_debug.contains(&format!("{:?}", 1)));
+        // AsRef
+        assert_eq!(1, *one.as_ref());
+        // Display
+        assert_eq!(format!("{}", 1), format!("{}", one));
+        // Pointer
+        assert_eq!(format!("{:p}", one), format!("{:p}", one.clone()));
+        // Hash
+        assert_eq!(calculate_hash(&1), calculate_hash(&one));
+        // Borrow
+        assert_eq!(1, *one.borrow());
+        // PartialEq
+        assert_eq!(one, other_one);
+        assert!(one != two);
+        // Eq
+        requires_eq(&one);
+        // PartialOrd
+        assert_eq!(Some(Ordering::Less), one.partial_cmp(&two));
+        assert_eq!(Some(Ordering::Equal), one.partial_cmp(&other_one));
+        assert_eq!(Some(Ordering::Greater), two.partial_cmp(&one));
+        assert!(one < two);
+        assert!(one <= two);
+        assert!(one <= other_one);
+        assert!(two > one);
+        assert!(two >= one);
+        assert!(two >= other_two);
+        // Ord
+        assert_eq!(Ordering::Less, one.cmp(&two));
+        assert_eq!(Ordering::Equal, one.cmp(&other_one));
+        assert_eq!(Ordering::Greater, two.cmp(&one));
     }
 
     #[test]
     fn std_impls_weak() {
+        use std::cmp::Ordering;
         let mut col = Collector::new();
-        let body = |mut proxy: Proxy| {
-            use std::cmp::Ordering;
-            fn requires_eq<E: Eq>(_e: &E) {}
-            let one = proxy.store(1);
-            let other_one = proxy.store(1);
-            let two = proxy.store(2);
-            let other_two = proxy.store(2);
+        let mut proxy = col.proxy();
 
-            let one = Gc::downgrade(&one);
-            let other_one = Gc::downgrade(&other_one);
-            let two = Gc::downgrade(&two);
-            let other_two = Gc::downgrade(&other_two);
-            // Clone
-            assert_eq!(1, *one.clone().upgrade().unwrap());
-            // Debug
-            let one_debug = format!("{:?}", one);
-            assert!(one_debug.contains("Weak"));
-            assert!(one_debug.contains(&format!("{:?}", 1)));
-            // PartialEq
-            assert_eq!(one, other_one);
-            assert!(one != two);
-            // Eq
-            requires_eq(&one);
-            // PartialOrd
-            assert_eq!(Some(Ordering::Less), one.partial_cmp(&two));
-            assert_eq!(Some(Ordering::Equal), one.partial_cmp(&other_one));
-            assert_eq!(Some(Ordering::Greater), two.partial_cmp(&one));
-            assert!(one < two);
-            assert!(one <= two);
-            assert!(one <= other_one);
-            assert!(two > one);
-            assert!(two >= one);
-            assert!(two >= other_two);
-            // Ord
-            assert_eq!(Ordering::Less, one.cmp(&two));
-            assert_eq!(Ordering::Equal, one.cmp(&other_one));
-            assert_eq!(Ordering::Greater, two.cmp(&one));
-        };
+        fn requires_eq<E: Eq>(_e: &E) {}
+        let one = proxy.store(1);
+        let other_one = proxy.store(1);
+        let two = proxy.store(2);
+        let other_two = proxy.store(2);
 
-        col.run_with_gc(body);
+        let one = Gc::downgrade(&one);
+        let other_one = Gc::downgrade(&other_one);
+        let two = Gc::downgrade(&two);
+        let other_two = Gc::downgrade(&other_two);
+        // Clone
+        assert_eq!(1, *one.clone().upgrade().unwrap());
+        // Debug
+        let one_debug = format!("{:?}", one);
+        assert!(one_debug.contains("Weak"));
+        assert!(one_debug.contains(&format!("{:?}", 1)));
+        // PartialEq
+        assert_eq!(one, other_one);
+        assert!(one != two);
+        // Eq
+        requires_eq(&one);
+        // PartialOrd
+        assert_eq!(Some(Ordering::Less), one.partial_cmp(&two));
+        assert_eq!(Some(Ordering::Equal), one.partial_cmp(&other_one));
+        assert_eq!(Some(Ordering::Greater), two.partial_cmp(&one));
+        assert!(one < two);
+        assert!(one <= two);
+        assert!(one <= other_one);
+        assert!(two > one);
+        assert!(two >= one);
+        assert!(two >= other_two);
+        // Ord
+        assert_eq!(Ordering::Less, one.cmp(&two));
+        assert_eq!(Ordering::Equal, one.cmp(&other_one));
+        assert_eq!(Ordering::Greater, two.cmp(&one));
     }
 
     #[test]
     fn gc_ptr_eq() {
-        Collector::new().run_with_gc(|mut proxy| {
-            let num = proxy.store(0);
-            let num_cl = num.clone();
-            let other_num = proxy.store(0);
+        let mut col = Collector::new();
+        let mut proxy = col.proxy();
+        let num = proxy.store(0);
+        let num_cl = num.clone();
+        let other_num = proxy.store(0);
 
-            assert!(Gc::ptr_eq(&num, &num_cl));
-            assert!(!Gc::ptr_eq(&num, &other_num));
-            assert!(!Gc::ptr_eq(&num_cl, &other_num));
-        });
+        assert!(Gc::ptr_eq(&num, &num_cl));
+        assert!(!Gc::ptr_eq(&num, &other_num));
+        assert!(!Gc::ptr_eq(&num_cl, &other_num));
     }
 
     #[test]
     fn get_mut_only_when_lone_ref() {
         use std::mem::drop;
-        Collector::new().run_with_gc(|mut proxy| {
-            let mut num = proxy.store(0);
-            assert!(Gc::get_mut(&mut num).is_some());
+        let mut col = Collector::new();
+        let mut proxy = col.proxy();
+        let mut num = proxy.store(0);
+        assert!(Gc::get_mut(&mut num).is_some());
 
-            let num_cl = num.clone();
-            assert!(Gc::get_mut(&mut num).is_none());
-            drop(num_cl);
-            assert!(Gc::get_mut(&mut num).is_some());
+        let num_cl = num.clone();
+        assert!(Gc::get_mut(&mut num).is_none());
+        drop(num_cl);
+        assert!(Gc::get_mut(&mut num).is_some());
 
-            let num_w = Gc::downgrade(&num);
-            assert!(Gc::get_mut(&mut num).is_none());
-            drop(num_w);
-            assert!(Gc::get_mut(&mut num).is_some());
-        });
+        let num_w = Gc::downgrade(&num);
+        assert!(Gc::get_mut(&mut num).is_none());
+        drop(num_w);
+        assert!(Gc::get_mut(&mut num).is_some());
     }
 
     #[test]
     fn make_mut_when_lone() {
-        Collector::new().run_with_gc(|mut proxy| {
-            let mut num = proxy.store(0);
-            assert_eq!(0, *num);
+        let mut col = Collector::new();
+        let mut proxy = col.proxy();
+        let mut num = proxy.store(0);
+        assert_eq!(0, *num);
+        {
+            let num_ref = Gc::make_mut(&mut num, &mut proxy);
             {
-                let num_ref = Gc::make_mut(&mut num, &mut proxy);
-                {
-                    // Checking that the mut ref doesn't take proxy's lifetime
-                    let _ = proxy.store(0);
-                }
-                *num_ref = 42;
+                // Checking that the mut ref doesn't take proxy's lifetime
+                let _ = proxy.store(0);
             }
-            assert_eq!(42, *num);
-        });
+            *num_ref = 42;
+        }
+        assert_eq!(42, *num);
     }
 
     #[test]
     fn make_mut_clones_when_others() {
         use std::mem::drop;
-        Collector::new().run_with_gc(|mut proxy| {
-            let mut num = proxy.store(0);
-            let num_cl = num.clone();
-            {
-                let num_ref = Gc::make_mut(&mut num, &mut proxy);
-                *num_ref = 42;
-            }
-            assert_eq!(42, *num);
-            assert_eq!(0, *num_cl);
-            drop(num_cl);
+        let mut col = Collector::new();
+        let mut proxy = col.proxy();
+        let mut num = proxy.store(0);
+        let num_cl = num.clone();
+        {
+            let num_ref = Gc::make_mut(&mut num, &mut proxy);
+            *num_ref = 42;
+        }
+        assert_eq!(42, *num);
+        assert_eq!(0, *num_cl);
+        drop(num_cl);
 
-            let num_w = Gc::downgrade(&num);
-            {
-                let num_ref = Gc::make_mut(&mut num, &mut proxy);
-                *num_ref = 99;
-            }
-            let num_from_w = num_w.upgrade().unwrap();
-            assert_eq!(99, *num);
-            assert_eq!(42, *num_from_w);
-        });
+        let num_w = Gc::downgrade(&num);
+        {
+            let num_ref = Gc::make_mut(&mut num, &mut proxy);
+            *num_ref = 99;
+        }
+        let num_from_w = num_w.upgrade().unwrap();
+        assert_eq!(99, *num);
+        assert_eq!(42, *num_from_w);
     }
 
     #[test]
     fn unwrap_ok_when_lone_or_has_weak() {
-        Collector::new().run_with_gc(|mut proxy| {
-            let num = proxy.store(42);
-            let removed_num = Gc::try_unwrap(num, &mut proxy);
-            let ok_num = removed_num.unwrap();
-            assert_eq!(42, ok_num);
-        });
+        let mut col = Collector::new();
+        let mut proxy = col.proxy();
 
-        Collector::new().run_with_gc(|mut proxy| {
-            let num = proxy.store(42);
-            let weak_1 = Gc::downgrade(&num);
-            let weak_2 = Gc::downgrade(&num);
-            let weak_3 = Gc::downgrade(&num);
-            let weak_4 = Gc::downgrade(&num);
-            let weak_5 = Gc::downgrade(&num);
-            let removed_num = Gc::try_unwrap(num, &mut proxy);
-            let ok_num = removed_num.unwrap();
-            assert_eq!(42, ok_num);
+        let num = proxy.store(42);
+        let removed_num = Gc::try_unwrap(num, &mut proxy);
+        let ok_num = removed_num.unwrap();
+        assert_eq!(42, ok_num);
 
-            assert!(!weak_1.is_alive());
-            assert!(!weak_2.is_alive());
-            assert!(!weak_3.is_alive());
-            assert!(!weak_4.is_alive());
-            assert!(!weak_5.is_alive());
-        });
+
+        let num = proxy.store(42);
+        let weak_1 = Gc::downgrade(&num);
+        let weak_2 = Gc::downgrade(&num);
+        let weak_3 = Gc::downgrade(&num);
+        let weak_4 = Gc::downgrade(&num);
+        let weak_5 = Gc::downgrade(&num);
+        let removed_num = Gc::try_unwrap(num, &mut proxy);
+        let ok_num = removed_num.unwrap();
+        assert_eq!(42, ok_num);
+
+        assert!(!weak_1.is_alive());
+        assert!(!weak_2.is_alive());
+        assert!(!weak_3.is_alive());
+        assert!(!weak_4.is_alive());
+        assert!(!weak_5.is_alive());
     }
 
     #[test]
     fn unwrap_err_when_multiple_refs() {
-        Collector::new().run_with_gc(|mut proxy| {
-            let num = proxy.store(42);
-            let num_cl = num.clone();
-            let err_num = Gc::try_unwrap(num, &mut proxy);
-            assert!(err_num.is_err());
-            if let Err(err_num_inner) = err_num {
-                assert_eq!(42, *err_num_inner);
-                assert!(Gc::ptr_eq(&err_num_inner, &num_cl));
-            }
-        });
+        let mut col = Collector::new();
+        let mut proxy = col.proxy();
+        let num = proxy.store(42);
+        let num_cl = num.clone();
+        let err_num = Gc::try_unwrap(num, &mut proxy);
+        assert!(err_num.is_err());
+        if let Err(err_num_inner) = err_num {
+            assert_eq!(42, *err_num_inner);
+            assert!(Gc::ptr_eq(&err_num_inner, &num_cl));
+        }
     }
 }
