@@ -3,6 +3,7 @@
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
 //! *TODO: Rename `Proxy`?*
+//! *TODO: Remove run_with_gc*
 //! *TODO: Docs for Collector::proxy*
 //! *TODO: Remove all calls to `run_with_gc`. Replace with just getting proxy*
 //! *TODO: Fix all docs about `run_with_gc`*
@@ -33,26 +34,21 @@
 //! // Make a new collector to keep the gc state
 //! let mut col = Collector::new();
 //!
-//! // Find out the meaning of life, and allow use of the gc while doing so
-//! let meaning = col.run_with_gc(|mut proxy| {
-//!     // Do some computations that are best expressed with a cyclic data structure
-//!     {
-//!         let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
-//!         let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
-//!         *thing1.0.borrow_mut() = Some(thing2.clone());
-//!     } // They are out of scope and no longer reachable here
+//! // Make a Proxy to access the API
+//! let mut proxy = col.proxy();
 //!
-//!     // Collect garbage
-//!     proxy.run();
+//! // Do some computations that are best expressed with a cyclic data structure
+//! {
+//!     let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
+//!     let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+//!     *thing1.0.borrow_mut() = Some(thing2.clone());
+//! }
 //!
-//!     // And we've successfully cleaned up the unused cyclic data
-//!     assert_eq!(proxy.num_tracked(), 0);
+//! // Collect garbage
+//! proxy.run();
 //!
-//!     // Return
-//!     42
-//! });
-//!
-//! assert_eq!(meaning, 42);
+//! // And we've successfully cleaned up the unused cyclic data
+//! assert_eq!(proxy.num_tracked(), 0);
 //! ```
 //!
 //! # Type Overview
@@ -129,7 +125,7 @@
 //! That [`Gc`] must be either on the stack or in the heap
 //! (such as if it was stored in a [`Box`] or [`Vec`]). Regardless, we assume that
 //! the client should be able to access it. If it is stored on the stack then
-//! it will be [`drop`]ed when it become inaccessable (after it goes out of scope).
+//! it will be [`drop`]ed when it become inaccessible (after it goes out of scope).
 //! If it is stored in the heap, it should be [`drop`]ed after the owner of the
 //! pointer goes out of scope. We assume that it hasn't been leaked, because
 //! we have no way of determining that. So we can say that the client can reach
@@ -290,22 +286,7 @@ impl Collector {
         }
     }
 
-    /// Run the passed function, providing it access to gc operations via a
-    /// [`Proxy`](struct.Proxy.html).
-    ///
-    /// Destroys all objects in the gc heap before returning.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ters_gc::Collector;
-    ///
-    /// let mut col = Collector::new();
-    ///
-    /// let val = col.run_with_gc(|_proxy| 42);
-    /// assert_eq!(val, 42);
-    ///
-    /// ```
+    // TODO: REMOVE
     pub fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
         let result = func(self.proxy());
         self.allocator.items.clear();
@@ -494,10 +475,10 @@ impl<'a> Proxy<'a> {
     /// ```
     /// use ters_gc::Collector;
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let val = proxy.store(42);
-    ///     assert_eq!(*val, 42);
-    /// });
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// let val = proxy.store(42);
+    /// assert_eq!(*val, 42);
     /// ```
     ///
     /// [`paused`]: #method.paused
@@ -513,14 +494,14 @@ impl<'a> Proxy<'a> {
     /// ```
     /// use ters_gc::Collector;
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     {
-    ///         proxy.store(42);
-    ///     }
-    ///     assert_eq!(proxy.num_tracked(), 1);
-    ///     proxy.run();
-    ///     assert_eq!(proxy.num_tracked(), 0);
-    /// });
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// {
+    ///     proxy.store(42);
+    /// }
+    /// assert_eq!(proxy.num_tracked(), 1);
+    /// proxy.run();
+    /// assert_eq!(proxy.num_tracked(), 0);
     /// ```
     pub fn run(&mut self) {
         self.collector.run();
@@ -536,9 +517,9 @@ impl<'a> Proxy<'a> {
     /// ```
     /// use ters_gc::Collector;
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     assert!(!proxy.paused());
-    /// });
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// assert!(!proxy.paused());
     /// ```
     ///
     /// [`run`]: #method.run
@@ -557,10 +538,10 @@ impl<'a> Proxy<'a> {
     /// ```
     /// use ters_gc::Collector;
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     proxy.pause();
-    ///     assert!(proxy.paused());
-    /// });
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// proxy.pause();
+    /// assert!(proxy.paused());
     /// ```
     ///
     /// [`resume`]: #method.resume
@@ -578,13 +559,13 @@ impl<'a> Proxy<'a> {
     /// ```
     /// use ters_gc::Collector;
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     proxy.pause();
-    ///     assert!(proxy.paused());
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// proxy.pause();
+    /// assert!(proxy.paused());
     ///
-    ///     proxy.resume();
-    ///     assert!(!proxy.paused());
-    /// });
+    /// proxy.resume();
+    /// assert!(!proxy.paused());
     /// ```
     pub fn resume(&mut self) {
         self.collector.resume();
@@ -597,15 +578,15 @@ impl<'a> Proxy<'a> {
     /// ```
     /// use ters_gc::Collector;
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     assert_eq!(proxy.num_tracked(), 0);
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// assert_eq!(proxy.num_tracked(), 0);
     ///
-    ///     let _ = proxy.store(());
-    ///     assert_eq!(proxy.num_tracked(), 1);
+    /// let _ = proxy.store(());
+    /// assert_eq!(proxy.num_tracked(), 1);
     ///
-    ///     let _ = proxy.store(());
-    ///     assert_eq!(proxy.num_tracked(), 2);
-    /// });
+    /// let _ = proxy.store(());
+    /// assert_eq!(proxy.num_tracked(), 2);
     /// ```
     pub fn num_tracked(&self) -> usize {
         self.collector.num_tracked()
@@ -624,9 +605,9 @@ impl<'a> Proxy<'a> {
     /// ```
     /// use ters_gc::Collector;
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     proxy.set_threshold_growth(0.75);
-    /// });
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// proxy.set_threshold_growth(0.75);
     /// ```
     pub fn set_threshold_growth(&mut self, factor: f64) {
         self.collector.sweep_factor = factor;
@@ -642,20 +623,18 @@ impl<'a> Proxy<'a> {
     /// ```
     /// use ters_gc::Collector;
     ///
+    ///
     /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// let init_thresh = proxy.threshold();
     ///
-    /// let init_thresh = col.run_with_gc(|proxy| proxy.threshold());
+    /// for _ in 0..(init_thresh + 1) {
+    ///     proxy.store(());
+    /// }
     ///
-    /// col.run_with_gc(|mut proxy| {
-    ///     for _ in 0..(init_thresh + 1) {
-    ///         proxy.store(());
-    ///     }
-    /// });
-    ///
-    /// let new_thresh = col.run_with_gc(|proxy| proxy.threshold());
+    /// let new_thresh = proxy.threshold();
     ///
     /// assert!(init_thresh != new_thresh);
-    ///
     /// ```
     ///
     pub fn threshold(&self) -> usize {
@@ -936,11 +915,12 @@ mod tests {
     #[test]
     fn set_sweep_factor() {
         let mut col = Collector::new();
-        col.run_with_gc(|mut proxy| proxy.set_threshold_growth(0.1));
-        let factor1 = col.sweep_factor;
+        let mut proxy = col.proxy();
+        proxy.set_threshold_growth(0.1);
+        let factor1 = proxy.collector.sweep_factor;
         assert_eq!(factor1, 0.1);
-        col.run_with_gc(|mut proxy| proxy.set_threshold_growth(0.9));
-        let factor2 = col.sweep_factor;
+        proxy.set_threshold_growth(0.9);
+        let factor2 = proxy.collector.sweep_factor;
         assert_eq!(factor2, 0.9);
     }
 }
