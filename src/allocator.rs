@@ -12,7 +12,7 @@ pub(crate) struct AllocInfo {
     pub ptr: NonNull<UntypedGcBox>,
     // unsafe is because it must be called with accompanying pointer
     rebox: unsafe fn(NonNull<UntypedGcBox>), // Frees allocation and calls destructor
-    reachable: Cell<bool>,    // Whether this has been found to be reachable
+    reachable: Cell<bool>,                   // Whether this has been found to be reachable
     inter_marks: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
     // unsafe is because it must be called with accompanying pointer
     refs: unsafe fn(NonNull<UntypedGcBox>) -> usize,

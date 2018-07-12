@@ -197,11 +197,16 @@
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 //! [`Tiny Garbage Collector`]: https://github.com/orangeduck/tgc
 
-#![deny(missing_docs,
-        missing_debug_implementations, missing_copy_implementations,
-        trivial_casts, trivial_numeric_casts,
-        unstable_features,
-        unused_import_braces, unused_qualifications)]
+#![deny(
+    missing_docs,
+    missing_debug_implementations,
+    missing_copy_implementations,
+    trivial_casts,
+    trivial_numeric_casts,
+    unstable_features,
+    unused_import_braces,
+    unused_qualifications
+)]
 
 pub mod ptr;
 pub use ptr::Gc;
@@ -214,7 +219,6 @@ use ptr::GcBox;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use trace::Trace;
-
 
 /// Used for type-erasure
 pub(crate) enum UntypedGcBox {}
