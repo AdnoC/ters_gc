@@ -75,7 +75,7 @@ impl Drop for AllocInfo {
 }
 
 /// Handles allocation and freeing of objects.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub(crate) struct Allocator {
     pub items: HashMap<*mut UntypedGcBox, AllocInfo>,
     // frees: Vec<AllocInfo>, // Only accessed in sweep func

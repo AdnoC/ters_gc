@@ -142,9 +142,12 @@ pub trait Trace {
         // noop
     }
 }
+
+#[derive(Debug)]
 pub(crate) struct TraceDest(pub NonNull<UntypedGcBox>);
 
 /// Destination for trace information.
+#[derive(Debug)]
 pub struct Tracer {
     targets: Vec<TraceDest>,
 }
@@ -520,10 +523,12 @@ mod tests {
             char, 'a'
             Box<str>, "Hello".to_string().into_boxed_str()
 
-            fn(), unsafe { transmute(0 as usize) }
-            fn() -> i8,  unsafe { transmute(0 as usize) }
-            fn(i8) -> i8, unsafe { transmute(0 as usize) }
-            fn(i8, u8, isize, usize) -> i8, unsafe { transmute(0 as usize) }
+            // Unsafe used to create dummy pointers of the correct type
+            // The pointers are never dereferenced
+            fn(), unsafe { transmute(0usize) }
+            fn() -> i8,  unsafe { transmute(0usize) }
+            fn(i8) -> i8, unsafe { transmute(0usize) }
+            fn(i8, u8, isize, usize) -> i8, unsafe { transmute(0usize) }
         );
         let t: &str = "Hello";
         tracer.add_target(&t);

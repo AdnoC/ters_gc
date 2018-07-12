@@ -197,7 +197,11 @@
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
 //! [`Tiny Garbage Collector`]: https://github.com/orangeduck/tgc
 
-pub(crate) enum UntypedGcBox {}
+#![deny(missing_docs,
+        missing_debug_implementations, missing_copy_implementations,
+        trivial_casts, trivial_numeric_casts,
+        unstable_features,
+        unused_import_braces, unused_qualifications)]
 
 pub mod ptr;
 pub use ptr::Gc;
@@ -210,6 +214,10 @@ use ptr::GcBox;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use trace::Trace;
+
+
+/// Used for type-erasure
+pub(crate) enum UntypedGcBox {}
 
 /// Cast a type-erased NonNull pointer to its original typed type
 /// (or at least to a type that is more likely to be correct and can be
@@ -243,7 +251,7 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 /// See [`Proxy`] for gc usage details.
 ///
 /// [`Proxy`]: struct.Proxy.html
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Collector {
     allocator: Allocator,
     collection_threshold: usize,
@@ -459,6 +467,7 @@ impl Collector {
 /// Allows for allocation and collection.
 ///
 /// Can also be used to control collection.
+#[derive(Debug)]
 pub struct Proxy<'arena> {
     collector: &'arena mut Collector,
 }
