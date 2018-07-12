@@ -282,6 +282,16 @@ impl Collector {
     }
 
     /// Create a new [`Proxy`](struct.Proxy.html) for this collector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// let mut col = Collector::new();
+    ///
+    /// let mut proxy = col.proxy();
+    /// ```
     // While allocator is active, all pointers to Collector are valid (since the arena
     // can't be moved while there is a reference to it)
     pub fn proxy(&mut self) -> Proxy {
