@@ -238,7 +238,7 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 }
 
 /// State container for grabage collection.
-/// Access to the API must go through a [`Proxy`].
+/// Access to gc API must go through a [`Proxy`].
 ///
 /// See [`Proxy`] for gc usage details.
 ///
@@ -454,7 +454,10 @@ impl Collector {
 }
 
 /// Provides access to the collector.
+///
 /// Allows for allocation and collection.
+///
+/// Can also be used to control collection.
 pub struct Proxy<'arena> {
     collector: &'arena mut Collector,
 }
@@ -462,7 +465,7 @@ pub struct Proxy<'arena> {
 impl<'a> Proxy<'a> {
     /// Stores something in the gc heap.
     ///
-    /// If not paused, runs the gc if the heap got too big.
+    /// If not [`paused`], runs the gc if the heap got too big.
     ///
     /// # Examples
     ///
@@ -474,6 +477,8 @@ impl<'a> Proxy<'a> {
     ///     assert_eq!(*val, 42);
     /// });
     /// ```
+    ///
+    /// [`paused`]: #method.paused
     pub fn store<T: Trace>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
         Gc::from_raw_nonnull(ptr, PhantomData)
@@ -498,11 +503,32 @@ impl<'a> Proxy<'a> {
     pub fn run(&mut self) {
         self.collector.run();
     }
+
+    /// Returns whether or not automatic collection is paused.
+    ///
+    /// When paused, garbage collection will only occur if started manually
+    /// via [`run`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::Collector;
+    ///
+    /// Collector::new().run_with_gc(|mut proxy| {
+    ///     assert!(!proxy.paused());
+    /// });
+    /// ```
+    ///
+    /// [`run`]: #method.run
+    pub fn paused(&self) -> bool {
+        self.collector.paused
+    }
+
     /// Pauses automatic collection.
     ///
-    /// Until [`Proxy::resume`][resume] is called, storing things in the gc
-    /// heap will not trigger collection. The only way collection with run
-    /// is if it is done manually with [`Proxy::run`][run].
+    /// Until [`resume`] is called, storing things in the gc
+    /// heap will not trigger collection. The only time collection will occur
+    /// is if it is done manually with [`run`].
     ///
     /// # Examples
     ///
@@ -515,30 +541,15 @@ impl<'a> Proxy<'a> {
     /// });
     /// ```
     ///
-    /// [resume]: #method.resume
-    /// [run]: #method.run
+    /// [`resume`]: #method.resume
+    /// [`run`]: #method.run
     pub fn pause(&mut self) {
         self.collector.pause();
     }
 
-    /// Whether or not automatic collection is paused.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ters_gc::Collector;
-    ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     assert!(!proxy.paused());
-    /// });
-    /// ```
-    pub fn paused(&self) -> bool {
-        self.collector.paused
-    }
-
     /// Resume automatic collection.
     ///
-    /// When storing something, will run collection if the gc heap is too big.
+    /// When storing something, it will run collection if the gc heap is too big.
     ///
     /// # Examples
     ///
@@ -557,7 +568,7 @@ impl<'a> Proxy<'a> {
         self.collector.resume();
     }
 
-    /// Gets the number of objects in the gc heap.
+    /// Returns the number of objects in the gc heap.
     ///
     /// # Examples
     ///
@@ -578,12 +589,13 @@ impl<'a> Proxy<'a> {
         self.collector.num_tracked()
     }
 
-    /// Set how much the threshold to run the gc when storing things grows.
+    /// Sets how much the threshold to run the gc when storing things grows.
     ///
     /// The higher the value the more objects you can store before storing triggers
     /// automatic collection.
     ///
-    /// Threshold is only updated after collection is run once.
+    /// The automatic collection threshold will not be updated until collection
+    /// is performed.
     ///
     /// # Examples
     ///
@@ -598,7 +610,10 @@ impl<'a> Proxy<'a> {
         self.collector.sweep_factor = factor;
     }
 
-    /// Get how much the threshold to run the gc when storing things grows.
+    /// Returns the number of objects that can be stored in the gc heap
+    /// before collection is automatically run.
+    ///
+    /// Changes every time collection is performed.
     ///
     /// # Examples
     ///
