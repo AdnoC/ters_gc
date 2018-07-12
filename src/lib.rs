@@ -77,7 +77,10 @@
 //!
 //! [`Trace`] is implemented for many of the types in `std`.
 //!
-//! # Soundness
+//! # Soundness (A.K.A. Is this safe?)
+//!
+//! This library should be safe to use and should not result in undefined
+//! behavior.
 //!
 //! Assuming the absence of bugs, use of this library should not cause any
 //! use-after-free errors (aside from the special case of destructors). [`Gc`]
@@ -89,6 +92,15 @@
 //! The most likely result of a user error (e.g. not telling the [`Tracer`] about all
 //! your [`Gc`] in your [`Trace`] impl or leaking a [`Gc`] pointer)
 //! is that the memory is leaked.
+//!
+//! The library doesn't use any platform-specific tricks and doesn't touch any
+//! memory outside of what it allocates. It uses typed, rust semantics when dealing
+//! with the types you store.  If the rust compiler decides that the best way of
+//! laying out a [`Gc`] in your struct is to split it in half and put in the middle
+//! all your struct's other members, it will still function correctly. It doesn't
+//! rely on pointer math nor the size, alignment, or layout of types when tracing.
+//! The only raw pointers created or dereferenced are ones to allocations it made.
+//! It doesn't touch the stack or crawl through the heap.
 //!
 //! # Garbage Collection Algorithm
 //!
@@ -136,7 +148,7 @@
 //! Dereferencing a [`Gc`] inside of an object's destructor may result in a panic.
 //!
 //! If you mean to store a struct inside the gc heap, that struct's destructor
-//! cannot dereference any [`Gc`]s it contains. So if you never plan on storing
+//! cannot dereference any [`Gc`]s it contains. So if you *never* plan on storing
 //! something in the gc heap it is safe to dereference a [`Gc`] in the destructor,
 //! but **make sure** you aren't going to store it.
 //!
@@ -147,7 +159,7 @@
 //! should not rely on order to "safely" access data through [`Gc`]s.
 //!
 //! If you absolutely **must** dereference a [`Gc`] in a destructor, you have to
-//! first chech [`Gc::is_alive`], or access using [`Gc::get`] (which checks that
+//! first check [`Gc::is_alive`], or access using [`Gc::get`] (which checks that
 //! it is alive).
 //!
 //! ## You can't leak [`Gc`]s outside of the gc heap
@@ -163,9 +175,6 @@
 //! ## The garbage collector is for single threaded use only
 //!
 //! None of the pointer types, nor [`Proxy`] should be [`Sync`] or [`Send`].
-//!
-//!
-//!
 //!
 //!
 //! [`Collector`]: struct.Collector.html
