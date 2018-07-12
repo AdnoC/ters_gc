@@ -108,8 +108,24 @@
 //! So, if the total number of [`Gc`]s is greater than the number of found [`Gc`]s,
 //! at least one [`Gc`] to the object must exist outside of the gc heap.
 //! That [`Gc`] must be either on the stack or in the heap
-//! (such as if it was stored in a [`Box`] or [`Vec`]). Regardless, it should
-//! be TODO finish
+//! (such as if it was stored in a [`Box`] or [`Vec`]). Regardless, we assume that
+//! the client should be able to access it. If it is stored on the stack then
+//! it will be [`drop`]ed when it become inaccessable (after it goes out of scope).
+//! If it is stored in the heap, it should be [`drop`]ed after the owner of the
+//! pointer goes out of scope. We assume that it hasn't been leaked, because
+//! we have no way of determining that. So we can say that the client can reach
+//! [`Gc`]s in the heap.
+//!
+//! We call objects with at least one [`Gc`] outside of the gc heap roots.
+//! Roots are objects that the client can directly reach. Roots are marked reachable.
+//!
+//! You can go through a [`Gc`] stored in a root object to reach the object
+//! that [`Gc`] points to. So, you can mark all the objects pointed to by
+//! [`Gc`]s stored in a root object as reachable. Then you can mark all objects
+//! pointed to by [`Gc`]s stored in the objects we just marked. Eventually
+//! all objects that are transitively reachable will be marked so.
+//!
+//! Now that we know which objects are reachable and which are not we can TODO Finish paragraph
 //!
 //! # Limitations
 //!
@@ -161,6 +177,7 @@
 //! [`Gc::is_alive`]: ptr/struct.Gc.html#method.is_alive
 //! [`Gc::get`]: ptr/struct.Gc.html#method.get
 //! [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
+//! [`drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
 //! [`mem::forget`]: https://doc.rust-lang.org/std/mem/fn.forget.html
 //! [`Sync`]: https://doc.rust-lang.org/std/marker/trait.Sync.html
 //! [`Send`]: https://doc.rust-lang.org/std/marker/trait.Send.html
