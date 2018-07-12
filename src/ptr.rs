@@ -153,7 +153,7 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
     fn clone(&self) -> Self {
         GcRef {
             _marker: self._marker,
-            ptr: self.ptr.clone(),
+            ptr: self.ptr,
         }
     }
 }
@@ -727,10 +727,6 @@ mod gc_impls {
         fn eq(&self, other: &Gc<'a, T>) -> bool {
             **self == **other
         }
-        #[inline(always)]
-        fn ne(&self, other: &Gc<'a, T>) -> bool {
-            **self != **other
-        }
     }
     impl<'a, T: 'a + Eq> Eq for Gc<'a, T> {}
     impl<'a, T: 'a + PartialOrd> PartialOrd for Gc<'a, T> {
@@ -948,10 +944,6 @@ mod weak_impls {
         #[inline(always)]
         fn eq(&self, other: &Weak<'a, T>) -> bool {
             *self.get_borrow() == *other.get_borrow()
-        }
-        #[inline(always)]
-        fn ne(&self, other: &Weak<'a, T>) -> bool {
-            *self.get_borrow() != *other.get_borrow()
         }
     }
     impl<'a, T: 'a + Eq> Eq for Weak<'a, T> {}

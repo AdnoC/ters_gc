@@ -389,7 +389,7 @@ impl Collector {
             }
         }
 
-        for ptr in unreachable_objects.into_iter() {
+        for ptr in unreachable_objects {
             self.allocator.free(ptr);
         }
 
