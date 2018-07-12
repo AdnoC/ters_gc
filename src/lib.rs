@@ -243,6 +243,7 @@ impl<T> AsUntyped for NonNull<GcBox<T>> {
 /// See [`Proxy`] for gc usage details.
 ///
 /// [`Proxy`]: struct.Proxy.html
+#[derive(Default)]
 pub struct Collector {
     allocator: Allocator,
     collection_threshold: usize,
