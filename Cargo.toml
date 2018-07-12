@@ -9,10 +9,10 @@ description = "Create garbage colleced pointers"
 keywords = ["arena", "gc"]
 
 
+[dev-dependencies.compiletest_rs]
+version = "0.3.11"
+features = ["stable"]
+
 [dev-dependencies]
-# compiletest_rs = "*"
 smallvec = "0.6.2"
 priority-queue = "0.5.1"
-
-[features]
-nightly = []
