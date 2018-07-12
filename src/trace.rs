@@ -57,44 +57,44 @@
 //!     }
 //! }
 //!
-//! Collector::new().run_with_gc(|mut proxy| {
-//!     let bct_stack = BigComplexThing {
-//!         name: TracePrinter(proxy.store(OsString::new())),
-//!         description: "default description".to_string(),
-//!         root_obj: Arc::new(RefCell::new(None)),
-//!         timestamp: TracePrinter(proxy.store(Instant::now())),
-//!         children: RefCell::new(Vec::new()),
-//!         a_number: 0,
-//!     };
+//! let mut col = Collector::new();
+//! let mut proxy = col.proxy();
+//! let bct_stack = BigComplexThing {
+//!     name: TracePrinter(proxy.store(OsString::new())),
+//!     description: "default description".to_string(),
+//!     root_obj: Arc::new(RefCell::new(None)),
+//!     timestamp: TracePrinter(proxy.store(Instant::now())),
+//!     children: RefCell::new(Vec::new()),
+//!     a_number: 0,
+//! };
 //!
-//!     let mut bct = proxy.store(TracePrinter(bct_stack));
+//! let mut bct = proxy.store(TracePrinter(bct_stack));
 //!
-//!     println!("Running");
-//!     proxy.run(); // Prints "trace occurred!" 3*N times
-//!                  // (where N is the number of traces per collection run)
+//! println!("Running");
+//! proxy.run(); // Prints "trace occurred!" 3*N times
+//!              // (where N is the number of traces per collection run)
 //!
-//!     println!("Adding more");
+//! println!("Adding more");
 //!
-//!     // 2-step process. First make the Gc, then store it.
-//!     // Otherwise we might start automatic collection when we store the `0`.
-//!     // If that happens, we'll panic because we borrowed `children`
-//!     // in order to push the entry, but the trace will also try to
-//!     // borrow it.
-//!     for _ in 0..3 {
-//!         let entry = TracePrinter(proxy.store(0));
-//!         bct.0.children.borrow_mut().push(entry);
-//!     }
-//!
-//!     println!("Running again");
-//!     proxy.run(); // Prints "trace occurred!" 6*N times
-//!
-//!     println!("Setting root");
+//! // 2-step process. First make the Gc, then store it.
+//! // Otherwise we might start automatic collection when we store the `0`.
+//! // If that happens, we'll panic because we borrowed `children`
+//! // in order to push the entry, but the trace will also try to
+//! // borrow it.
+//! for _ in 0..3 {
 //!     let entry = TracePrinter(proxy.store(0));
-//!     *bct.0.root_obj.borrow_mut() = Some(entry);
+//!     bct.0.children.borrow_mut().push(entry);
+//! }
 //!
-//!     println!("Running once more");
-//!     proxy.run(); // Prints "trace occurred!" 7*N times
-//! });
+//! println!("Running again");
+//! proxy.run(); // Prints "trace occurred!" 6*N times
+//!
+//! println!("Setting root");
+//! let entry = TracePrinter(proxy.store(0));
+//! *bct.0.root_obj.borrow_mut() = Some(entry);
+//!
+//! println!("Running once more");
+//! proxy.run(); // Prints "trace occurred!" 7*N times
 //! ```
 //!
 //! [`Trace`] has a default implementation for structs that don't contain
@@ -109,9 +109,9 @@
 //! // Give `I32Newtype` a noop implementation
 //! impl Trace for I32Newtype {}
 //!
-//! Collector::new().run_with_gc(|mut proxy| {
-//!     proxy.store(I32Newtype(22));
-//! });
+//! let mut col = Collector::new();
+//! let mut proxy = col.proxy();
+//! proxy.store(I32Newtype(22));
 //! ```
 //!
 //!
