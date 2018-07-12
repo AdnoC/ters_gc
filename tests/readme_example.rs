@@ -1,30 +1,3 @@
-```
-A tinee Rust garbage collector (ters gc)
-  ^   ^ ^ ^  ^       ^
-```
-
-("tiny" is deliberately misspelled for the sake of the acronym)
-
-A mark-and-sweep garbage collecting allocator.
-Based loosely on orangeduck's
-[`Tiny Garbage Collector`](https://github.com/orangeduck/tgc).
-
-Provides the `Gc` type, essentially an [`Rc`](https://doc.rust-lang.org/std/rc/struct.Rc.html)
-that can handle cycles.
-
-
-# Example
-
-Add this to your 'Cargo.toml':
-
-```toml
-[dependencies]
-ters_gc = "0.1"
-```
-
-main.rs:
-
-```rust
 extern crate ters_gc;
 
 use ters_gc::{Collector, Gc, trace};
@@ -66,4 +39,3 @@ fn main() {
 
     assert_eq!(meaning_of_life, 42);
 }
-```
