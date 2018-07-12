@@ -6,7 +6,6 @@
 //! *TODO: Docs for Collector::proxy*
 //! *TODO: Remove all calls to `run_with_gc`. Replace with just getting proxy*
 //! *TODO: Fix all docs about `run_with_gc`*
-//! *TODO: impl Drop for Proxy - Have it clear the allocator map*
 //! *TODO: Change crate doc test to no longer use `run_with_gc`*
 //! *TODO: Change README test to no longer use `run_with_gc`*
 //!
@@ -667,6 +666,12 @@ impl<'a> Proxy<'a> {
     // Tested in `::ptr`
     pub(crate) fn try_remove<T>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
         self.collector.try_remove(gc)
+    }
+}
+
+impl<'a> Drop for Proxy<'a> {
+    fn drop(&mut self) {
+        self.collector.allocator.items.clear();
     }
 }
 
