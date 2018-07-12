@@ -478,6 +478,7 @@ impl<'a> Proxy<'a> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
+    ///
     /// let val = proxy.store(42);
     /// assert_eq!(*val, 42);
     /// ```
@@ -497,6 +498,7 @@ impl<'a> Proxy<'a> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
+    ///
     /// {
     ///     proxy.store(42);
     /// }
@@ -520,6 +522,7 @@ impl<'a> Proxy<'a> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
+    ///
     /// assert!(!proxy.paused());
     /// ```
     ///
@@ -541,6 +544,7 @@ impl<'a> Proxy<'a> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
+    ///
     /// proxy.pause();
     /// assert!(proxy.paused());
     /// ```
@@ -562,6 +566,7 @@ impl<'a> Proxy<'a> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
+    ///
     /// proxy.pause();
     /// assert!(proxy.paused());
     ///
@@ -581,6 +586,7 @@ impl<'a> Proxy<'a> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
+    ///
     /// assert_eq!(proxy.num_tracked(), 0);
     ///
     /// let _ = proxy.store(());
@@ -608,6 +614,7 @@ impl<'a> Proxy<'a> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
+    ///
     /// proxy.set_threshold_growth(0.75);
     /// ```
     pub fn set_threshold_growth(&mut self, factor: f64) {
@@ -627,6 +634,7 @@ impl<'a> Proxy<'a> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
+    ///
     /// let init_thresh = proxy.threshold();
     ///
     /// for _ in 0..(init_thresh + 1) {
