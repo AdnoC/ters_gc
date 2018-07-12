@@ -2,6 +2,12 @@
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
+//! *TODO: Rename `Proxy`?*
+//! *TODO: Docs for Collector::proxy*
+//! *TODO: Remove all calls to `run_with_gc`. Replace with just getting proxy*
+//! *TODO: Fix all docs about `run_with_gc`*
+//! *TODO: impl Drop for Proxy - Have it clear the allocator map*
+//!
 //! A mark-and-sweep garbage collecting allocator.
 //! Based loosely on orangeduck's [`Tiny Garbage Collector`].
 //!
@@ -198,7 +204,7 @@
 //! [`Tiny Garbage Collector`]: https://github.com/orangeduck/tgc
 
 #![deny(
-    missing_docs,
+    // missing_docs,
     missing_debug_implementations,
     missing_copy_implementations,
     trivial_casts,
@@ -416,7 +422,7 @@ impl Collector {
     }
     // While allocator is active, all pointers to Collector are valid (since the arena
     // can't be moved while there is a reference to it)
-    fn proxy(&mut self) -> Proxy {
+    pub fn proxy(&mut self) -> Proxy {
         Proxy { collector: self }
     }
     fn try_remove<'a, T: 'a>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
@@ -914,34 +920,33 @@ mod tests {
     #[test]
     fn get_current_threshold() {
         let mut col = Collector::new();
-        let threshold = col.run_with_gc(|proxy| proxy.threshold());
-        assert_eq!(col.collection_threshold, threshold);
+        let mut proxy = col.proxy();
+        let threshold = proxy.threshold();
+        assert_eq!(proxy.collector.collection_threshold, threshold);
 
         let num_useful = 13;
         let num_wasted = threshold - num_useful;
         assert!(threshold > num_useful);
 
-        col.run_with_gc(|mut proxy: Proxy| {
-            let mut head = LinkedList { next: None };
-            macro_rules! prepend_ll {
-                () => {{
-                    let boxed = proxy.store(head);
-                    LinkedList { next: Some(boxed) }
-                }};
-            }
-            for _ in 0..num_useful {
-                head = prepend_ll!(); //(&mut proxy, head);
-            }
-            for _ in 0..num_wasted {
-                proxy.store(22);
-            }
-            assert_eq!(proxy.num_tracked(), threshold);
+        let mut head = LinkedList { next: None };
+        macro_rules! prepend_ll {
+            () => {{
+                let boxed = proxy.store(head);
+                LinkedList { next: Some(boxed) }
+            }};
+        }
+        for _ in 0..num_useful {
             head = prepend_ll!(); //(&mut proxy, head);
-            assert_eq!(proxy.num_tracked(), num_useful + 1);
-            assert!(head.next.is_some());
-        });
+        }
+        for _ in 0..num_wasted {
+            proxy.store(22);
+        }
+        assert_eq!(proxy.num_tracked(), threshold);
+        head = prepend_ll!(); //(&mut proxy, head);
+        assert_eq!(proxy.num_tracked(), num_useful + 1);
+        assert!(head.next.is_some());
 
-        let after_thresh = col.run_with_gc(|proxy| proxy.threshold());
+        let after_thresh = proxy.threshold();
         assert_eq!(20, after_thresh);
     }
 

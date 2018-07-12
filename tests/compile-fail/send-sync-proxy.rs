@@ -4,25 +4,25 @@ use std::mem::drop;
 use std::thread;
 
 fn proxy_not_send() {
-    Collector::new().run_with_gc(|mut proxy| {
-        thread::spawn(move || { //~ ERROR Send` is not satisfied
-                                //~^ ERROR Send` is not satisfied
-                                //~| cannot be sent between threads safely
-            drop(proxy);
-        });
+    let mut col = Collector::new();
+    let proxy = col.proxy();
+    thread::spawn(move || { //~ ERROR Send` is not satisfied
+        //~^ ERROR Send` is not satisfied
+        //~| cannot be sent between threads safely
+        drop(proxy);
     });
 }
 
 fn proxy_not_sync() {
-    Collector::new().run_with_gc(|mut proxy| {
-            let proxy_ref = &proxy;
-            thread::spawn(move || { //~ ERROR cannot be shared between threads safely
-                                    //~^ ERROR cannot be shared between threads safely
-                                    //~^^ ERROR cannot be shared between threads safely
-                                    //~^^^ ERROR cannot be shared between threads safely
-                                    //~| Sync` is not implemented
-                drop(proxy_ref);
-            });
+    let mut col = Collector::new();
+    let proxy = col.proxy();
+    let proxy_ref = &proxy;
+        thread::spawn(move || { //~ ERROR cannot be shared between threads safely
+                                //~^ ERROR cannot be shared between threads safely
+                                //~^^ ERROR cannot be shared between threads safely
+                                //~^^^ ERROR cannot be shared between threads safely
+                                //~| Sync` is not implemented
+        drop(proxy_ref);
     });
 }
 

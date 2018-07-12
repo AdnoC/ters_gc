@@ -4,51 +4,51 @@ use std::mem::drop;
 use std::thread;
 
 fn gc_not_send() {
-    Collector::new().run_with_gc(|mut proxy| {
-        let num = proxy.store(5);
-        thread::spawn(move || { //~ ERROR Send` is not satisfied
-                                //~^ ERROR Send` is not satisfied
-                                //~| cannot be sent between threads safely
-            drop(num);
-        });
+    let mut col = Collector::new();
+    let mut proxy = col.proxy();
+    let num = proxy.store(5);
+    thread::spawn(move || { //~ ERROR Send` is not satisfied
+                            //~^ ERROR Send` is not satisfied
+                            //~| cannot be sent between threads safely
+        drop(num);
     });
 }
 
 fn weak_not_send() {
-    Collector::new().run_with_gc(|mut proxy| {
-        let num = proxy.store(5);
-        let num = Gc::downgrade(&num);
-        thread::spawn(move || { //~ ERROR Send` is not satisfied
-                                //~^ ERROR Send` is not satisfied
-                                //~| cannot be sent between threads safely
-            drop(num);
-        });
+    let mut col = Collector::new();
+    let mut proxy = col.proxy();
+    let num = proxy.store(5);
+    let num = Gc::downgrade(&num);
+    thread::spawn(move || { //~ ERROR Send` is not satisfied
+                            //~^ ERROR Send` is not satisfied
+                            //~| cannot be sent between threads safely
+        drop(num);
     });
 }
 
 
 fn gc_not_sync() {
-    Collector::new().run_with_gc(|mut proxy| {
-        let num = proxy.store(5);
-        let num_ref = &num;
-        thread::spawn(move || { //~ ERROR cannot be shared between threads safely
-                                //~^ ERROR cannot be shared between threads safely
-                                //~| Sync` is not implemented for 
-            drop(num_ref);
-        });
+    let mut col = Collector::new();
+    let mut proxy = col.proxy();
+    let num = proxy.store(5);
+    let num_ref = &num;
+    thread::spawn(move || { //~ ERROR cannot be shared between threads safely
+                            //~^ ERROR cannot be shared between threads safely
+                            //~| Sync` is not implemented for 
+        drop(num_ref);
     });
 }
 
 fn weak_not_sync() {
-    Collector::new().run_with_gc(|mut proxy| {
-        let num = proxy.store(5);
-        let num = Gc::downgrade(&num);
-        let num_ref = &num;
-        thread::spawn(move || { //~ ERROR cannot be shared between threads safely
-                                //~^ ERROR cannot be shared between threads safely
-                                //~| Sync` is not implemented for 
-            drop(num_ref);
-        });
+    let mut col = Collector::new();
+    let mut proxy = col.proxy();
+    let num = proxy.store(5);
+    let num = Gc::downgrade(&num);
+    let num_ref = &num;
+    thread::spawn(move || { //~ ERROR cannot be shared between threads safely
+                            //~^ ERROR cannot be shared between threads safely
+                            //~| Sync` is not implemented for 
+        drop(num_ref);
     });
 }
 
