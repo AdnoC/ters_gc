@@ -307,8 +307,7 @@ impl Collector {
         if self.should_collect() {
             self.run();
         }
-        let ptr = self.allocator.alloc(val);
-        ptr
+        self.allocator.alloc(val)
     }
 
     fn run(&mut self) {
@@ -434,8 +433,8 @@ impl Collector {
     fn ideal_size(&self) -> usize {
         // Primes taken from tgc
         const PRIMES: [usize; 24] = [
-            0, 1, 5, 11, 23, 53, 101, 197, 389, 683, 1259, 2417, 4733, 9371, 18617, 37097, 74093,
-            148073, 296099, 592019, 1100009, 2200013, 4400021, 8800019,
+            0, 1, 5, 11, 23, 53, 101, 197, 389, 683, 1_259, 2_417, 4_733, 9_371, 18_617, 37_097,
+            74_093, 148_073, 296_099, 592_019, 1_100_009, 2_200_013, 4_400_021, 8_800_019,
         ];
 
         let target = (self.num_tracked() + 1) as f64 / self.load_factor;
