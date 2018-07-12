@@ -93,7 +93,8 @@
 //! # Garbage Collection Algorithm
 //!
 //! Collection is done in two phases. The mark phase determines which objects are
-//! still reachable. The sweep phase frees all the objects that weren't marked
+//! still reachable. If an object is reachable it can be considered in use by the
+//! client program. The sweep phase frees all the objects that weren't marked
 //! reachable during the mark phase.
 //!
 //! The mark phase is also split into two steps. First the collector visits every
@@ -125,7 +126,8 @@
 //! pointed to by [`Gc`]s stored in the objects we just marked. Eventually
 //! all objects that are transitively reachable will be marked so.
 //!
-//! Now that we know which objects are reachable and which are not we can TODO Finish paragraph
+//! Now that we know which objects are reachable and which are not we can free
+//! objects the client is no longer using.
 //!
 //! # Limitations
 //!
