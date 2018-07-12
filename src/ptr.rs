@@ -517,7 +517,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html
     // Not safe in destructor: Allocator::remove dereferences the passed ptr
     pub fn try_unwrap(this: Self, proxy: &mut Proxy<'a>) -> Result<T, Self> {
-        proxy.try_remove(this)
+        proxy.collector.try_remove(this)
     }
 }
 impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {

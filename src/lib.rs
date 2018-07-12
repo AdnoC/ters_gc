@@ -407,11 +407,16 @@ impl Collector {
         self.allocator.items.len()
     }
 
-    fn try_remove<'a, T: 'a>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
+    pub(crate) fn try_remove<'a, T: 'a>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
         // Gc must be valid and the only strong pointer to the object
         if Gc::is_alive(&gc) && Gc::strong_count(&gc) == 1 {
             let ptr = gc.get_nonnull_gc_box().as_untyped();
-            Ok(self.allocator.remove::<T>(ptr))
+            // This is safe because the we are taking both the `T` and the
+            // pointer from the `Gc`.
+            // We are guaranteed for the `T` to be the same type as was originally
+            // stored when allocating the ptr.
+            let val = unsafe { self.allocator.remove::<T>(ptr) };
+            Ok(val)
         } else {
             Err(gc)
         }
@@ -648,11 +653,6 @@ impl<'a> Proxy<'a> {
     ///
     pub fn threshold(&self) -> usize {
         self.collector.collection_threshold
-    }
-
-    // Tested in `::ptr`
-    pub(crate) fn try_remove<T>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
-        self.collector.try_remove(gc)
     }
 }
 

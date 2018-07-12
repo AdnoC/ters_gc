@@ -98,11 +98,14 @@ impl Allocator {
         self.items.remove(&ptr.as_ptr()); // Will be deallocated by Drop
     }
     /// Remove an object and return it's value
-    pub fn remove<T>(&mut self, ptr: NonNull<UntypedGcBox>) -> T {
+    ///
+    /// Unsafe because `T` must be the type that was originally stored
+    pub unsafe fn remove<T>(&mut self, ptr: NonNull<UntypedGcBox>) -> T {
         use std::mem::forget;
         let item = self.items.remove(&ptr.as_ptr());
         forget(item);
-        let boxed: Box<GcBox<T>> = unsafe { Box::from_raw(ptr.as_typed().as_ptr()) };
+        // The unsafe part
+        let boxed: Box<GcBox<T>> = Box::from_raw(ptr.as_typed().as_ptr());
         boxed.reclaim_value()
     }
 
