@@ -195,9 +195,9 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// ```
 /// use ters_gc::Collector;
 ///
-/// Collector::new().run_with_gc(|mut proxy| {
-///     let _gc_ptr = proxy.store(0);
-/// });
+/// let mut col = Collector::new();
+/// let mut proxy = col.proxy();
+/// let _gc_ptr = proxy.store(0);
 /// ```
 ///
 /// [`Proxy::store`]: ../struct.Proxy.html#method.store
@@ -256,11 +256,12 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let meaning_of_life = proxy.store(42);
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     assert!(Gc::is_alive(&meaning_of_life));
-    /// });
+    /// let meaning_of_life = proxy.store(42);
+    ///
+    /// assert!(Gc::is_alive(&meaning_of_life));
     /// ```
     pub fn is_alive(this: &Self) -> bool {
         this.life_tracker.is_alive()
@@ -281,13 +282,14 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let dk_high_score = proxy.store(1_247_700);
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    /// 
+    /// let dk_high_score = proxy.store(1_247_700);
     ///
-    ///     let score_ref = Gc::get(&dk_high_score).unwrap();
+    /// let score_ref = Gc::get(&dk_high_score).unwrap();
     ///
-    ///     assert_eq!(*score_ref, 1_247_700);
-    /// });
+    /// assert_eq!(*score_ref, 1_247_700);
     /// ```
     ///
     /// [`is_alive`]: #method.is_alive
@@ -316,29 +318,30 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let mut gpa = proxy.store(2.4);
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     *Gc::get_mut(&mut gpa).unwrap() = 4.0;
+    /// let mut gpa = proxy.store(2.4);
     ///
-    ///     assert_eq!(*gpa, 4.0);
+    /// *Gc::get_mut(&mut gpa).unwrap() = 4.0;
     ///
-    ///     {
-    ///         let other_gpa_ptr = gpa.clone();
+    /// assert_eq!(*gpa, 4.0);
     ///
-    ///         assert!(Gc::get_mut(&mut gpa).is_none());
-    ///     }
+    /// {
+    ///     let other_gpa_ptr = gpa.clone();
     ///
-    ///     assert!(Gc::get_mut(&mut gpa).is_some());
+    ///     assert!(Gc::get_mut(&mut gpa).is_none());
+    /// }
     ///
-    ///     {
-    ///         let weak_other_gpa_ptr = Gc::downgrade(&gpa);
+    /// assert!(Gc::get_mut(&mut gpa).is_some());
     ///
-    ///         assert!(Gc::get_mut(&mut gpa).is_none());
-    ///     }
+    /// {
+    ///     let weak_other_gpa_ptr = Gc::downgrade(&gpa);
     ///
-    ///     assert!(Gc::get_mut(&mut gpa).is_some());
-    /// });
+    ///     assert!(Gc::get_mut(&mut gpa).is_none());
+    /// }
+    ///
+    /// assert!(Gc::get_mut(&mut gpa).is_some());
     /// ```
     ///
     /// [`make_mut`]: #method.make_mut
@@ -386,14 +389,15 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let nes_sales = proxy.store(61_910_000);
-    ///     let same_nes_sales = nes_sales.clone();
-    ///     let famicom_sales = proxy.store(61_910_000);
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     assert!(Gc::ptr_eq(&nes_sales, &same_nes_sales));
-    ///     assert!(!Gc::ptr_eq(&nes_sales, &famicom_sales));
-    /// });
+    /// let nes_sales = proxy.store(61_910_000);
+    /// let same_nes_sales = nes_sales.clone();
+    /// let famicom_sales = proxy.store(61_910_000);
+    ///
+    /// assert!(Gc::ptr_eq(&nes_sales, &same_nes_sales));
+    /// assert!(!Gc::ptr_eq(&nes_sales, &famicom_sales));
     /// ```
     pub fn ptr_eq(this: &Self, other: &Self) -> bool {
         this.ptr.ptr == other.ptr.ptr
@@ -406,12 +410,13 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let months = proxy.store(12);
-    ///     let also_months = months.clone();
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     assert_eq!(Gc::strong_count(&months), 2);
-    /// });
+    /// let months = proxy.store(12);
+    /// let also_months = months.clone();
+    ///
+    /// assert_eq!(Gc::strong_count(&months), 2);
     /// ```
     pub fn strong_count(this: &Gc<'a, T>) -> usize {
         Gc::get_gc_box(this).strong_count()
@@ -424,12 +429,13 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let days_in_year = proxy.store(365);
-    ///     let _weak_days = Gc::downgrade(&days_in_year);
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     assert_eq!(Gc::weak_count(&days_in_year), 1);
-    /// });
+    /// let days_in_year = proxy.store(365);
+    /// let _weak_days = Gc::downgrade(&days_in_year);
+    ///
+    /// assert_eq!(Gc::weak_count(&days_in_year), 1);
     /// ```
     ///
     /// [`Weak`]: struct.Weak.html
@@ -446,11 +452,12 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let mariana_depth = proxy.store(10_994); // meters
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     let weak_depth = Gc::downgrade(&mariana_depth);
-    /// });
+    /// let mariana_depth = proxy.store(10_994); // meters
+    ///
+    /// let weak_depth = Gc::downgrade(&mariana_depth);
     /// ```
     ///
     /// [`Weak`]: struct.Weak.html
@@ -490,19 +497,18 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// use ters_gc::{Collector, Gc};
     ///
     /// let mut col = Collector::new();
-    /// let zambia_gdp = col.run_with_gc(|mut proxy| {
+    /// let mut proxy = col.proxy();
     ///
-    ///     let zambia_2016_gdp = proxy.store(19_550_000_000); // USD
+    /// let zambia_2016_gdp = proxy.store(19_550_000_000); // USD
     ///
-    ///     let gdp_clone = zambia_2016_gdp.clone();
+    /// let gdp_clone = zambia_2016_gdp.clone();
     ///
-    ///     let gdp_gc_again = Gc::try_unwrap(zambia_2016_gdp, &mut proxy)
-    ///         .unwrap_err();
+    /// let gdp_gc_again = Gc::try_unwrap(zambia_2016_gdp, &mut proxy)
+    ///     .unwrap_err();
     ///
-    ///     drop(gdp_clone);
+    /// drop(gdp_clone);
     ///
-    ///     Gc::try_unwrap(gdp_gc_again, &mut proxy).unwrap()
-    /// });
+    /// let zambia_gdp = Gc::try_unwrap(gdp_gc_again, &mut proxy).unwrap();
     ///
     /// assert_eq!(zambia_gdp, 19_550_000_000);
     /// ```
@@ -535,19 +541,20 @@ impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let mut num_us_states = proxy.store(50);
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     let mut num_without_hawaii = num_us_states.clone();
-    ///     *Gc::make_mut(&mut num_without_hawaii, &mut proxy) = 49;
+    /// let mut num_us_states = proxy.store(50);
     ///
-    ///     assert_eq!(*num_us_states, 50);
-    ///     assert_eq!(*num_without_hawaii, 49);
+    /// let mut num_without_hawaii = num_us_states.clone();
+    /// *Gc::make_mut(&mut num_without_hawaii, &mut proxy) = 49;
     ///
-    ///     *Gc::make_mut(&mut num_us_states, &mut proxy) = 500;
+    /// assert_eq!(*num_us_states, 50);
+    /// assert_eq!(*num_without_hawaii, 49);
     ///
-    ///     assert_eq!(*num_us_states, 500);
-    /// });
+    /// *Gc::make_mut(&mut num_us_states, &mut proxy) = 500;
+    ///
+    /// assert_eq!(*num_us_states, 500);
     /// ```
     ///
     /// [`Proxy`]: ../struct.Proxy.html
@@ -600,18 +607,19 @@ impl<'a, T: 'a> Drop for Gc<'a, T> {
     ///
     /// impl Trace for Foo { }
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let foo = proxy.store(Foo);
-    ///     let foo2 = foo.clone();
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     drop(foo);
+    /// let foo = proxy.store(Foo);
+    /// let foo2 = foo.clone();
     ///
-    ///     proxy.run(); // Doesn't print anything
+    /// drop(foo);
     ///
-    ///     drop(foo2);
+    /// proxy.run(); // Doesn't print anything
     ///
-    ///     proxy.run(); // Prints "dropped!"
-    /// });
+    /// drop(foo2);
+    ///
+    /// proxy.run(); // Prints "dropped!"
     /// ```
     fn drop(&mut self) {
         if Self::is_alive(self) {
@@ -647,10 +655,11 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let five = proxy.store(5);
-    ///     five.clone();
-    /// });
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    ///
+    /// let five = proxy.store(5);
+    /// five.clone();
     /// ```
     fn clone(&self) -> Self {
         if !Self::is_alive(self) {
@@ -798,22 +807,23 @@ impl<'a, T: 'a> Weak<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let everest_height = proxy.store(8_848); // meters
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     let weak_height = Gc::downgrade(&everest_height);
+    /// let everest_height = proxy.store(8_848); // meters
     ///
-    ///     let strong_height: Option<Gc<_>> = weak_height.upgrade();
-    ///     assert!(strong_height.is_some());
+    /// let weak_height = Gc::downgrade(&everest_height);
     ///
-    ///     // Destroy all strong pointers
-    ///     drop(everest_height);
-    ///     drop(strong_height);
-    ///     // Reclaim memory
-    ///     proxy.run();
+    /// let strong_height: Option<Gc<_>> = weak_height.upgrade();
+    /// assert!(strong_height.is_some());
     ///
-    ///     assert!(weak_height.upgrade().is_none());
-    /// });
+    /// // Destroy all strong pointers
+    /// drop(everest_height);
+    /// drop(strong_height);
+    /// // Reclaim memory
+    /// proxy.run();
+    ///
+    /// assert!(weak_height.upgrade().is_none());
     /// ```
     ///
     /// [`Gc`]: struct.Gc.html
@@ -834,19 +844,20 @@ impl<'a, T: 'a> Weak<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let hd = proxy.store(1080);
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     let weak_hd = Gc::downgrade(&hd);
+    /// let hd = proxy.store(1080);
     ///
-    ///     assert!(weak_hd.is_alive());
+    /// let weak_hd = Gc::downgrade(&hd);
     ///
-    ///     // Reclaim memory
-    ///     drop(hd);
-    ///     proxy.run();
+    /// assert!(weak_hd.is_alive());
     ///
-    ///     assert!(!weak_hd.is_alive());
-    /// });
+    /// // Reclaim memory
+    /// drop(hd);
+    /// proxy.run();
+    ///
+    /// assert!(!weak_hd.is_alive());
     /// ```
     pub fn is_alive(&self) -> bool {
         self.life_tracker.is_alive()
@@ -892,11 +903,12 @@ impl<'a, T: 'a> Clone for Weak<'a, T> {
     /// ```
     /// use ters_gc::{Collector, Gc};
     ///
-    /// Collector::new().run_with_gc(|mut proxy| {
-    ///     let weak_five = Gc::downgrade(&proxy.store(5));
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
     ///
-    ///     weak_five.clone();
-    /// });
+    /// let weak_five = Gc::downgrade(&proxy.store(5));
+    ///
+    /// weak_five.clone();
     /// ```
     fn clone(&self) -> Self {
         self.incr_weak();
