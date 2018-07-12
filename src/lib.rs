@@ -3,11 +3,6 @@
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
 //! *TODO: Rename `Proxy`?*
-//! *TODO: Remove run_with_gc*
-//! *TODO: Docs for Collector::proxy*
-//! *TODO: Remove all calls to `run_with_gc`. Replace with just getting proxy*
-//! *TODO: Fix all docs about `run_with_gc`*
-//! *TODO: Change crate doc test to no longer use `run_with_gc`*
 //!
 //! A mark-and-sweep garbage collecting allocator.
 //! Based loosely on orangeduck's [`Tiny Garbage Collector`].
@@ -200,7 +195,7 @@
 //! [`Tiny Garbage Collector`]: https://github.com/orangeduck/tgc
 
 #![deny(
-    // missing_docs,
+    missing_docs,
     missing_debug_implementations,
     missing_copy_implementations,
     trivial_casts,
@@ -286,11 +281,11 @@ impl Collector {
         }
     }
 
-    // TODO: REMOVE
-    pub fn run_with_gc<R, T: FnOnce(Proxy) -> R>(&mut self, func: T) -> R {
-        let result = func(self.proxy());
-        self.allocator.items.clear();
-        result
+    /// Create a new [`Proxy`](struct.Proxy.html) for this collector.
+    // While allocator is active, all pointers to Collector are valid (since the arena
+    // can't be moved while there is a reference to it)
+    pub fn proxy(&mut self) -> Proxy {
+        Proxy { collector: self }
     }
 
     fn alloc<T: Trace>(&mut self, val: T) -> NonNull<GcBox<T>> {
@@ -401,11 +396,7 @@ impl Collector {
     fn num_tracked(&self) -> usize {
         self.allocator.items.len()
     }
-    // While allocator is active, all pointers to Collector are valid (since the arena
-    // can't be moved while there is a reference to it)
-    pub fn proxy(&mut self) -> Proxy {
-        Proxy { collector: self }
-    }
+
     fn try_remove<'a, T: 'a>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
         // Gc must be valid and the only strong pointer to the object
         if Gc::is_alive(&gc) && Gc::strong_count(&gc) == 1 {
