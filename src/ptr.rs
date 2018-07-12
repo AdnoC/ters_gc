@@ -709,7 +709,7 @@ mod gc_impls {
     }
     impl<'a, T: 'a> fmt::Pointer for Gc<'a, T> {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            fmt::Pointer::fmt(&(&**self as *const T), f)
+            fmt::Pointer::fmt(&(&**self), f)
         }
     }
     impl<'a, T: 'a + Hash> Hash for Gc<'a, T> {
