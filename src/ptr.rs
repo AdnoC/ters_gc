@@ -137,12 +137,12 @@ impl<'a, T: 'a> GcRef<'a, T> {
         GcRef { _marker, ptr }
     }
 
-    unsafe fn get_gc_box<'t>(&'t self) -> &'t GcBox<T> {
+    unsafe fn gc_box<'t>(&'t self) -> &'t GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid
         self.ptr.as_ref()
     }
-    unsafe fn get_gc_box_mut<'t>(&'t mut self) -> &'t mut GcBox<T> {
+    unsafe fn gc_box_mut<'t>(&'t mut self) -> &'t mut GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid
         self.ptr.as_mut()
@@ -219,7 +219,7 @@ pub struct Gc<'arena, T: 'arena> {
 impl<'a, T: 'a> Gc<'a, T> {
     pub(crate) fn from_raw_gcref(gc_ref: GcRef<'a, T>) -> Gc<'a, T> {
         let gc = Gc {
-            life_tracker: unsafe { gc_ref.get_gc_box().tracker() },
+            life_tracker: unsafe { gc_ref.gc_box().tracker() },
             ptr: gc_ref,
         };
         gc.incr_ref();
@@ -236,12 +236,12 @@ impl<'a, T: 'a> Gc<'a, T> {
 
     fn incr_ref(&self) {
         assert!(Gc::is_alive(self));
-        Gc::get_gc_box(self).incr_ref();
+        Gc::gc_box(self).incr_ref();
     }
 
     fn decr_ref(&self) {
         assert!(Gc::is_alive(self));
-        Gc::get_gc_box(self).decr_ref();
+        Gc::gc_box(self).decr_ref();
     }
 
     /// Whether or not the object pointed to by this `Gc` is still valid and has
@@ -301,7 +301,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
     pub fn get(this: &Self) -> Option<&T> {
         if Self::is_alive(this) {
-            Some(this.get_gc_box().borrow())
+            Some(this.gc_box().borrow())
         } else {
             None
         }
@@ -360,30 +360,30 @@ impl<'a, T: 'a> Gc<'a, T> {
             // This `Gc` is garunteed to be the sole strong reference to the data.
             // So, we can safely get a mut reference to the `GcBox` since there
             // is nobody else who can who can access the data.
-            unsafe { Some(this.get_gc_box_mut().borrow_mut()) }
+            unsafe { Some(this.gc_box_mut().borrow_mut()) }
         } else {
             None
         }
     }
 
-    pub(crate) fn get_nonnull_gc_box(&self) -> NonNull<GcBox<T>> {
+    pub(crate) fn nonnull_box_ptr(&self) -> NonNull<GcBox<T>> {
         self.ptr.ptr
     }
 
-    fn get_gc_box(&self) -> &GcBox<T> {
+    fn gc_box(&self) -> &GcBox<T> {
         assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid (unless we are in the `sweep` phase, in which case
         // this isn't called when dead).
-        unsafe { self.ptr.get_gc_box() }
+        unsafe { self.ptr.gc_box() }
     }
 
-    unsafe fn get_gc_box_mut(&mut self) -> &mut GcBox<T> {
+    unsafe fn gc_box_mut(&mut self) -> &mut GcBox<T> {
         assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid (unless we are in the `sweep` phase, in which case
         // this isn't called when dead).
-        self.ptr.get_gc_box_mut()
+        self.ptr.gc_box_mut()
     }
 
     /// Returns `true` if the two `Gc`s point to the same value
@@ -432,7 +432,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// assert_eq!(Gc::strong_count(&months), 2);
     /// ```
     pub fn strong_count(this: &Gc<'a, T>) -> usize {
-        Gc::get_gc_box(this).strong_count()
+        Gc::gc_box(this).strong_count()
     }
 
     /// Gets the number of [`Weak`] pointers to this value.
@@ -457,7 +457,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///
     /// [`Weak`]: struct.Weak.html
     pub fn weak_count(this: &Gc<'a, T>) -> usize {
-        Gc::get_gc_box(this).weak_count()
+        Gc::gc_box(this).weak_count()
     }
 
     /// Creates a new [`Weak`] pointer to this value.
@@ -602,7 +602,7 @@ impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
             // reference to the data.
             // So, we can safely get a mut reference to the `GcBox` since there
             // is nobody else who can who can access the data.
-            unsafe { this.get_gc_box_mut().borrow_mut() }
+            unsafe { this.gc_box_mut().borrow_mut() }
         }
     }
 }
@@ -898,7 +898,7 @@ impl<'a, T: 'a> Weak<'a, T> {
     fn get(&self) -> Option<&T> {
         if self.is_alive() {
             // Unsafe is fine because if we are alive the pointer is valid
-            let gc_ref = unsafe { self.ptr.get_gc_box() };
+            let gc_ref = unsafe { self.ptr.gc_box() };
             Some(gc_ref.borrow())
         } else {
             None
@@ -911,7 +911,7 @@ impl<'a, T: 'a> Weak<'a, T> {
     fn get_gc_box(&self) -> Option<&GcBox<T>> {
         if self.is_alive() {
             // Unsfe is ok since we checked that we won't be accessing freed memory
-            Some(unsafe { self.ptr.get_gc_box() })
+            Some(unsafe { self.ptr.gc_box() })
         } else {
             None
         }
@@ -1032,7 +1032,7 @@ mod tests {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
         fn get_ref_num<'a, T>(gc: &Gc<'a, T>) -> usize {
-            Gc::get_gc_box(gc).refs.clone().take()
+            Gc::gc_box(gc).refs.clone().take()
         }
         let num = proxy.store(42);
         assert_eq!(get_ref_num(&num), 1);
@@ -1081,7 +1081,7 @@ mod tests {
         let mut proxy = col.proxy();
         let num_safe = {
             let num = proxy.store(0);
-            Gc::get_gc_box(&num).decr_ref();
+            Gc::gc_box(&num).decr_ref();
             num
         };
 
@@ -1096,7 +1096,7 @@ mod tests {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
         let num = proxy.store(0);
-        Gc::get_gc_box(&num).decr_ref();
+        Gc::gc_box(&num).decr_ref();
 
         proxy.run();
         assert_eq!(proxy.num_tracked(), 0);

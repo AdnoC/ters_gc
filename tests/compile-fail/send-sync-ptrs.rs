@@ -34,7 +34,7 @@ fn gc_not_sync() {
     let num_ref = &num;
     thread::spawn(move || { //~ ERROR cannot be shared between threads safely
                             //~^ ERROR cannot be shared between threads safely
-                            //~| Sync` is not implemented for 
+                            //~| Sync` is not implemented for
         drop(num_ref);
     });
 }
@@ -47,7 +47,7 @@ fn weak_not_sync() {
     let num_ref = &num;
     thread::spawn(move || { //~ ERROR cannot be shared between threads safely
                             //~^ ERROR cannot be shared between threads safely
-                            //~| Sync` is not implemented for 
+                            //~| Sync` is not implemented for
         drop(num_ref);
     });
 }

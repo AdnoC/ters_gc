@@ -411,7 +411,7 @@ impl Collector {
     pub(crate) fn try_remove<'a, T: 'a>(&mut self, gc: Gc<'a, T>) -> Result<T, Gc<'a, T>> {
         // Gc must be valid and the only strong pointer to the object
         if Gc::is_alive(&gc) && Gc::strong_count(&gc) == 1 {
-            let ptr = gc.get_nonnull_gc_box().as_untyped();
+            let ptr = gc.nonnull_box_ptr().as_untyped();
             // This is safe because the we are taking both the `T` and the
             // pointer from the `Gc`.
             // We are guaranteed for the `T` to be the same type as was originally
