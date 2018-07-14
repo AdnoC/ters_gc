@@ -36,16 +36,6 @@ impl<'a> Graph<'a> {
     // Removes all references to a node from everything in the graph.
     // Since we are using a GC its fine if references to it exist outside of us.
     fn remove_node_by_name(&mut self, name: &str) -> Option<GcNode<'a>> {
-        for node in &self.nodes {
-            let idx = node
-                .adjacencies
-                .borrow()
-                .iter()
-                .position(|edge| edge.dest.name == name);
-            if let Some(idx) = idx {
-                node.adjacencies.borrow_mut().remove(idx);
-            }
-        }
         let idx = self.nodes.iter().position(|node| node.name == name);
         idx.map(|idx| self.nodes.remove(idx))
     }
@@ -160,6 +150,11 @@ impl<'a> Trace for Node<'a> {
 fn connect_bidirectional<'a>(proxy: &mut Proxy<'a>, a: GcNode<'a>, b: GcNode<'a>, weight: u32) {
     a.connect_to(proxy, b.clone(), weight);
     b.connect_to(proxy, a, weight);
+}
+
+fn _disconnect_bidirectional<'a>(a: GcNode<'a>, b: GcNode<'a>) {
+    a.disconnect_from(b.clone());
+    b.disconnect_from(a);
 }
 
 impl<'a> fmt::Debug for Node<'a> {
@@ -336,8 +331,27 @@ fn dijkstra_is_cool() {
     // To show the BBQ-ans how much cooler the US is, they decided to create new
     // airports.
     fn secede_texas<'a>(proxy: &mut Proxy<'a>, graph: &mut Graph<'a>) {
-        graph.remove_node_by_name(IAH);
-        graph.remove_node_by_name(ATL);
+        // Disallow flight to the traitorous state
+        {
+            let dtw = graph.node_by_name(DTW).unwrap();
+            let jfk = graph.node_by_name(JFK).unwrap();
+            let las = graph.node_by_name(LAS).unwrap();
+            let iah = graph.node_by_name(IAH).unwrap();
+            let atl = graph.node_by_name(ATL).unwrap();
+
+            dtw.disconnect_from(iah.clone());
+            jfk.disconnect_from(iah.clone());
+            las.disconnect_from(iah.clone());
+
+            dtw.disconnect_from(atl.clone());
+            jfk.disconnect_from(atl.clone());
+
+
+            // Remove the airports themselves from the list
+            graph.remove_node_by_name(IAH);
+            graph.remove_node_by_name(ATL);
+        }
+
         let pre_tracked = proxy.num_tracked();
         proxy.run();
         let post_tracked = proxy.num_tracked();
