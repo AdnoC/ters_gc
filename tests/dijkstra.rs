@@ -153,9 +153,7 @@ impl<'a> Node<'a> {
 
 impl<'a> Trace for Node<'a> {
     fn trace(&self, tracer: &mut Tracer) {
-        for edge in self.adjacencies.borrow().iter() {
-            tracer.add_target(edge);
-        }
+        tracer.add_target(&self.adjacencies);
     }
 }
 
