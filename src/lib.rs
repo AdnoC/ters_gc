@@ -61,8 +61,8 @@
 //! The [`Weak`] pointer isn't counted during reachability analysis.
 //! You can have thousands of them, but if they are the only things
 //! referencing an object, that object will be freed next time the collector
-//! is run. It knows when the pointed-to object has been freed and will deny
-//! access after that occurs.
+//! is run. You have to [`upgrade`] to a [`Gc`] before you can access the
+//! inner object.
 //!
 //! # Storing Custom Structs
 //!
@@ -142,6 +142,9 @@
 //!
 //! Dereferencing a [`Gc`] inside of an object's destructor may result in a panic.
 //!
+//! Many other methods on [`Gc`] also exhibit the same behavior. The documentation
+//! for [`Gc`]'s methods specify if they can panic.
+//!
 //! If you mean to store a struct inside the gc heap, that struct's destructor
 //! cannot dereference any [`Gc`]s it contains. So if you *never* plan on storing
 //! something in the gc heap it is safe to dereference a [`Gc`] in the destructor,
@@ -150,11 +153,11 @@
 //! As a general rule of thumb, if a type implements [`Trace`], it shouldn't
 //! dereference any [`Gc`]s in its destructor.
 //!
-//! The order objects are destroyed during collection is unspecified, so you
-//! should not rely on order to "safely" access data through [`Gc`]s.
+//! The order objects are destroyed during collection might be changed in future
+//! verstions, so you should not rely on order to "safely" access data through [`Gc`]s.
 //!
-//! If you absolutely **must** dereference a [`Gc`] in a destructor, you have to
-//! first check [`Gc::is_alive`], or access using [`Gc::get`] (which checks that
+//! If you absolutely **must** dereference a [`Gc`] in a destructor, you either have to
+//! first check [`Gc::is_alive`] or access using [`Gc::get`] (which checks that
 //! it is alive).
 //!
 //! ## You can't leak [`Gc`]s outside of the gc heap
@@ -163,9 +166,8 @@
 //! to from being reclaimed, leaking that memory.
 //!
 //! The collector knows how many pointers to an object exist. If it can't
-//! find all of them it assumes the ones it can't find are somewhere
-//! in the heap, but that the user still has a way of reaching it (like through
-//! a [`Box`]).
+//! find all of them it assumes the ones it can't find are on the stack or somewhere
+//! in the heap that the user has a way of reaching (like through a [`Box`]).
 //!
 //! ## The garbage collector is for single threaded use only
 //!
@@ -186,6 +188,7 @@
 //! [`Proxy::run`]: struct.Proxy.html#method.run
 //! [`Gc::is_alive`]: ptr/struct.Gc.html#method.is_alive
 //! [`Gc::get`]: ptr/struct.Gc.html#method.get
+//! [`upgrade`]: ptr/struct.Weak.html#method.upgrade
 //! [`Drop::drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
 //! [`drop`]: https://doc.rust-lang.org/std/ops/trait.Drop.html#tymethod.drop
 //! [`mem::forget`]: https://doc.rust-lang.org/std/mem/fn.forget.html
