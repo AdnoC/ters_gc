@@ -219,6 +219,7 @@ pub struct Gc<'arena, T: 'arena> {
 impl<'a, T: 'a> Gc<'a, T> {
     pub(crate) fn from_raw_gcref(gc_ref: GcRef<'a, T>) -> Gc<'a, T> {
         let gc = Gc {
+            // Unsafe is ok since we are only passed living objects
             life_tracker: unsafe { gc_ref.gc_box().tracker() },
             ptr: gc_ref,
         };
