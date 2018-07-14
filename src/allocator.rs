@@ -11,7 +11,7 @@ use {AsTyped, AsUntyped};
 pub(crate) struct AllocInfo {
     pub ptr: NonNull<UntypedGcBox>,
     // unsafe is because it must be called with accompanying pointer
-    rebox: unsafe fn(NonNull<UntypedGcBox>), // Frees allocation and calls destructor
+    free: unsafe fn(NonNull<UntypedGcBox>), // Frees allocation and calls destructor
     reachable: Cell<bool>,                   // Whether this has been found to be reachable
     inter_marks: Cell<usize>, // # of marks from objects for which is_marked_reachable == false
     // unsafe is because it must be called with accompanying pointer
@@ -24,7 +24,7 @@ impl AllocInfo {
     fn new<T: Trace>(value: T) -> AllocInfo {
         AllocInfo {
             ptr: store_single_value(value).as_untyped(),
-            rebox: get_rebox::<T>(),
+            free: get_free::<T>(),
             reachable: Cell::new(false),
             inter_marks: Cell::new(0),
             refs: get_refs_accessor::<T>(),
@@ -70,7 +70,7 @@ impl Drop for AllocInfo {
     fn drop(&mut self) {
         // This is used as the destructor for the pointer, so it should the only
         // reference to the object.
-        unsafe { (self.rebox)(self.ptr) };
+        unsafe { (self.free)(self.ptr) };
     }
 }
 
@@ -135,12 +135,12 @@ fn store_single_value<T>(value: T) -> NonNull<GcBox<T>> {
     unsafe { NonNull::new_unchecked(Box::leak(storage)) }
 }
 
-fn get_rebox<T>() -> unsafe fn(NonNull<UntypedGcBox>) {
+fn get_free<T>() -> unsafe fn(NonNull<UntypedGcBox>) {
     /// Must be called with accompanying pointer
-    unsafe fn rebox<T>(ptr: NonNull<UntypedGcBox>) {
+    unsafe fn free<T>(ptr: NonNull<UntypedGcBox>) {
         Box::<GcBox<T>>::from_raw(ptr.as_typed().as_ptr());
     }
-    rebox::<T>
+    free::<T>
 }
 
 fn get_refs_accessor<T>() -> unsafe fn(NonNull<UntypedGcBox>) -> usize {
