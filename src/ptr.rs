@@ -1112,7 +1112,7 @@ mod tests {
     #[test]
     fn variance_works() {
         // Check compile-test for cases that are illegal
-        fn _variant_with_gc() {
+        fn _covariant_with_gc() {
             fn _expect<'a>(_: &'a i32, _: Gc<&'a i32>) {
                 unimplemented!()
             }
@@ -1122,7 +1122,7 @@ mod tests {
             }
         }
 
-        fn _variant_with_weak() {
+        fn _covariant_with_weak() {
             fn _expect<'a>(_: &'a i32, _: Weak<&'a i32>) {
                 unimplemented!()
             }
@@ -1130,6 +1130,14 @@ mod tests {
                 let val = 13;
                 _expect(&val, m);
             }
+        }
+
+        fn _contravariant_with_gc() {
+            fn expect<'a, 'g>(_: &'a i32, gc: Gc<'g, &'static i32>) -> Gc<'g, &'a i32> { gc }
+        }
+
+        fn _contravariant_with_weak() {
+            fn expect<'a, 'g>(_: &'a i32, wk: Weak<'g, &'static i32>) -> Weak<'g, &'a i32> { wk }
         }
     }
 
