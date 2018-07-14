@@ -33,10 +33,10 @@ pub(crate) struct GcBox<T: ?Sized> {
 impl<T> GcBox<T> {
     pub fn new(val: T) -> GcBox<T> {
         GcBox {
-            val,
             refs: Cell::new(0),
             weak: Cell::new(0),
             coroner: Coroner::new(),
+            val,
         }
     }
     pub fn reclaim_value(self) -> T {
@@ -158,6 +158,9 @@ impl<'a, T: 'a + ?Sized> Clone for GcRef<'a, T> {
         }
     }
 }
+
+// impl<'a, T: 'a + ?Sized + ::std::marker::Unsize<U>, U: ?Sized>
+// ::std::ops::CoerceUnsized<GcRef<'a, U>> for GcRef<'a, T> {}
 
 /// A single-threaded garbage collected pointer.
 /// 'Gc' stands for 'Garbage Collected'.
@@ -1394,19 +1397,32 @@ mod tests {
             assert!(Gc::ptr_eq(&err_num_inner, &num_cl));
         }
     }
-    // #[test]
-    // fn store_unsized_types() {
-    //     use std::rc::Rc;
-    //     let val = 42;
-    //
-    //     let r: Rc<Trace> = Rc::new(val);
-    //
-    //     let mut col = Collector::new();
-    //     let mut proxy = col.proxy();
-    //     let r: Gc<Trace>  = proxy.store(val);
-    //     let r: GcRef<Trace> = GcRef {
-    //         _marker: PhantomData,
-    //         ptr: unimplemented!()
-    //     };
-    // }
+
+    #[test]
+    fn store_unsized_types() {
+        // TODO work on this and ?Sized support
+        use std::rc::Rc;
+        let val = 42;
+
+        let _r: Rc<ToString> = Rc::new(val);
+
+        let gc_box: GcBox<i32> = GcBox::new(val);
+        let boxed_box: Box<GcBox<ToString>> = Box::new(gc_box);
+        let nonnull_box = unsafe { NonNull::new_unchecked(Box::leak(boxed_box)) };
+
+        // let gc_ref: GcRef<Trace> = GcRef::from_raw_nonnull(nonnull_box, PhantomData);
+        let _gc: Gc<ToString> = Gc::from_raw_nonnull(nonnull_box, PhantomData);
+
+// pub(crate) struct GcRef<'arena, T: 'arena + ?Sized> {
+//     _marker: PhantomData<&'arena T>,
+//     ptr: NonNull<GcBox<T>>,
+// }
+        let mut col = Collector::new();
+        let mut _proxy = col.proxy();
+        // let stored_gc: Gc<ToString>  = proxy.store(val);
+        // let r: GcRef<Trace> = GcRef {
+        //     _marker: PhantomData,
+        //     ptr: unimplemented!()
+        // };
+    }
 }
