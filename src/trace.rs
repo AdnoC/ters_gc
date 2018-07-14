@@ -172,7 +172,7 @@ impl Tracer {
 
 impl<'a, T> Trace for Gc<'a, T> {
     fn trace(&self, tracer: &mut Tracer) {
-        if let Some(box_ptr) = self.box_ptr() {
+        if let Some(box_ptr) = self.get_box_ptr() {
             tracer.add_box(box_ptr);
         }
     }

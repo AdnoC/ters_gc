@@ -171,6 +171,10 @@
 //!
 //! None of the pointer types, nor [`Proxy`] should be [`Sync`] or [`Send`].
 //!
+//! ## Supports [`Sized`] type only
+//!
+//! There are plans for unsized type support, but it is not yet implemented
+//!
 //!
 //! [`Collector`]: struct.Collector.html
 //! [`Proxy`]: struct.Proxy.html
@@ -190,6 +194,7 @@
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
 //! [`Vec`]: https://doc.rust-lang.org/std/vec/struct.Vec.html
 //! [`Rc`]: https://doc.rust-lang.org/std/rc/struct.Rc.html
+//! [`Sized`]: https://doc.rust-lang.org/std/marker/trait.Sized.html
 //! [`Tiny Garbage Collector`]: https://github.com/orangeduck/tgc
 
 // #![feature(unsize, coerce_unsized)]

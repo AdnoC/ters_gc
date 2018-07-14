@@ -423,10 +423,6 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
         }
     }
 
-    pub(crate) fn nonnull_box_ptr(&self) -> NonNull<GcBox<T>> {
-        self.ptr.ptr
-    }
-
     fn gc_box(&self) -> &GcBox<T> {
         assert!(Gc::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
@@ -448,8 +444,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
         self.ptr.gc_box_mut()
     }
 
-    /// Returns `true` if the two `Gc`s point to the same value
-    /// (not just values that compare as equal).
+    /// Creates a new [`Weak`] pointer to this value.
     ///
     /// # Safety
     ///
@@ -463,15 +458,19 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let nes_sales = proxy.store(61_910_000);
-    /// let same_nes_sales = nes_sales.clone();
-    /// let famicom_sales = proxy.store(61_910_000);
+    /// let mariana_depth = proxy.store(10_994); // meters
     ///
-    /// assert!(Gc::ptr_eq(&nes_sales, &same_nes_sales));
-    /// assert!(!Gc::ptr_eq(&nes_sales, &famicom_sales));
+    /// let weak_depth = Gc::downgrade(&mariana_depth);
     /// ```
-    pub fn ptr_eq(this: &Self, other: &Self) -> bool {
-        this.ptr.ptr == other.ptr.ptr
+    ///
+    /// [`Weak`]: struct.Weak.html
+    pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
+        let weak = Weak {
+            life_tracker: this.life_tracker.clone(),
+            ptr: this.ptr.clone(),
+        };
+        weak.incr_weak();
+        weak
     }
 
     /// Get the number of strong (`Gc`) pointers to this value.
@@ -522,7 +521,9 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
         Gc::gc_box(this).weak_count()
     }
 
-    /// Creates a new [`Weak`] pointer to this value.
+
+    /// Returns `true` if the two `Gc`s point to the same value
+    /// (not just values that compare as equal).
     ///
     /// # Safety
     ///
@@ -536,32 +537,38 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let mariana_depth = proxy.store(10_994); // meters
+    /// let nes_sales = proxy.store(61_910_000);
+    /// let same_nes_sales = nes_sales.clone();
+    /// let famicom_sales = proxy.store(61_910_000);
     ///
-    /// let weak_depth = Gc::downgrade(&mariana_depth);
+    /// assert!(Gc::ptr_eq(&nes_sales, &same_nes_sales));
+    /// assert!(!Gc::ptr_eq(&nes_sales, &famicom_sales));
     /// ```
-    ///
-    /// [`Weak`]: struct.Weak.html
-    pub fn downgrade(this: &Gc<'a, T>) -> Weak<'a, T> {
-        let weak = Weak {
-            life_tracker: this.life_tracker.clone(),
-            ptr: this.ptr.clone(),
-        };
-        weak.incr_weak();
-        weak
+    pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+        this.ptr.ptr == other.ptr.ptr
     }
 
+    /// Returns a reference to inner value
+    ///
+    /// # Panics
+    ///
+    /// Panics if the backing storage is dead
     fn get_borrow(&self) -> &T {
         Gc::get(self).expect("gc pointer was already dead")
     }
 
-    pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
+    pub(crate) fn get_box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
         if Gc::is_alive(self) {
             Some(self.ptr.ptr)
         } else {
             None
         }
     }
+
+    pub(crate) fn nonnull_box_ptr(&self) -> NonNull<GcBox<T>> {
+        self.ptr.ptr
+    }
+
 
 }
 impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
@@ -851,6 +858,33 @@ pub struct Weak<'arena, T: 'arena + ?Sized> {
 }
 
 impl<'a, T: 'a + ?Sized> Weak<'a, T> {
+    /// Returns whether the inner object has been reclaimed and freed.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    ///
+    /// let hd = proxy.store(1080);
+    ///
+    /// let weak_hd = Gc::downgrade(&hd);
+    ///
+    /// assert!(weak_hd.is_alive());
+    ///
+    /// // Reclaim memory
+    /// drop(hd);
+    /// proxy.run();
+    ///
+    /// assert!(!weak_hd.is_alive());
+    /// ```
+    pub fn is_alive(&self) -> bool {
+        self.life_tracker.is_alive()
+    }
+
     /// Attempts to upgrade the `Weak` pointer to a [`Gc`], preventing the inner
     /// value from being reclaimed if successful.
     ///
@@ -890,32 +924,6 @@ impl<'a, T: 'a + ?Sized> Weak<'a, T> {
         }
     }
 
-    /// Returns whether the inner object has been reclaimed and freed.
-    ///
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ters_gc::{Collector, Gc};
-    ///
-    /// let mut col = Collector::new();
-    /// let mut proxy = col.proxy();
-    ///
-    /// let hd = proxy.store(1080);
-    ///
-    /// let weak_hd = Gc::downgrade(&hd);
-    ///
-    /// assert!(weak_hd.is_alive());
-    ///
-    /// // Reclaim memory
-    /// drop(hd);
-    /// proxy.run();
-    ///
-    /// assert!(!weak_hd.is_alive());
-    /// ```
-    pub fn is_alive(&self) -> bool {
-        self.life_tracker.is_alive()
-    }
 
     fn get(&self) -> Option<&T> {
         if self.is_alive() {
