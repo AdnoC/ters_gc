@@ -23,7 +23,7 @@ use trace::Trace;
 use Proxy;
 
 /// Backing data of `Gc`s. The thing that is allocated and stores the user's value.
-pub(crate) struct GcBox<T> {
+pub(crate) struct GcBox<T: ?Sized> {
     refs: Cell<usize>,
     weak: Cell<usize>,
     coroner: Coroner,
@@ -43,7 +43,7 @@ impl<T> GcBox<T> {
         self.val
     }
 }
-impl<T> GcBox<T> {
+impl<T: ?Sized> GcBox<T> {
     pub fn incr_ref(&self) {
         self.refs.set(self.refs.get() + 1);
     }
@@ -126,11 +126,11 @@ impl Clone for LifeTracker {
 }
 
 /// Lifetime-restricted pointer to a `GcBox`
-pub(crate) struct GcRef<'arena, T: 'arena> {
+pub(crate) struct GcRef<'arena, T: 'arena + ?Sized> {
     _marker: PhantomData<&'arena T>,
     ptr: NonNull<GcBox<T>>,
 }
-impl<'a, T: 'a> GcRef<'a, T> {
+impl<'a, T: 'a + ?Sized> GcRef<'a, T> {
     pub(crate) fn from_raw_nonnull(
         ptr: NonNull<GcBox<T>>,
         _marker: PhantomData<&'a T>,
@@ -150,7 +150,7 @@ impl<'a, T: 'a> GcRef<'a, T> {
     }
 }
 
-impl<'a, T: 'a> Clone for GcRef<'a, T> {
+impl<'a, T: 'a + ?Sized> Clone for GcRef<'a, T> {
     fn clone(&self) -> Self {
         GcRef {
             _marker: self._marker,
@@ -213,11 +213,53 @@ impl<'a, T: 'a> Clone for GcRef<'a, T> {
 /// [`Cell`]: https://doc.rust-lang.org/std/cell/struct.Cell.html
 /// [`RefCell`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html
 // TODO Mention reference counts?
-pub struct Gc<'arena, T: 'arena> {
+pub struct Gc<'arena, T: 'arena + ?Sized> {
     ptr: GcRef<'arena, T>,
     life_tracker: LifeTracker,
 }
 impl<'a, T: 'a> Gc<'a, T> {
+    /// Returns the contained value, if the `Gc` is alive and has exactly one
+    /// strong reference.
+    ///
+    /// Otherwise, an [`Err`] is returned with the same `Gc` that was passed in.
+    ///
+    /// This will succeed even if there are outstanding weak references.
+    ///
+    /// Requires access to the [`Proxy`] in order to stop tracking the object.
+    ///
+    /// # Safety
+    ///
+    /// Safe to use in destructors.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// let mut col = Collector::new();
+    /// let mut proxy = col.proxy();
+    ///
+    /// let zambia_2016_gdp = proxy.store(19_550_000_000); // USD
+    ///
+    /// let gdp_clone = zambia_2016_gdp.clone();
+    ///
+    /// let gdp_gc_again = Gc::try_unwrap(zambia_2016_gdp, &mut proxy).unwrap_err();
+    ///
+    /// drop(gdp_clone);
+    ///
+    /// let zambia_gdp = Gc::try_unwrap(gdp_gc_again, &mut proxy).unwrap();
+    ///
+    /// assert_eq!(zambia_gdp, 19_550_000_000);
+    /// ```
+    ///
+    /// [`Proxy`]: ../struct.Proxy.html
+    /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html
+    // Not safe in destructor: Allocator::remove dereferences the passed ptr
+    pub fn try_unwrap(this: Self, proxy: &mut Proxy<'a>) -> Result<T, Self> {
+        proxy.collector.try_remove(this)
+    }
+}
+impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     pub(crate) fn from_raw_gcref(gc_ref: GcRef<'a, T>) -> Gc<'a, T> {
         let gc = Gc {
             // Unsafe is ok since we are only passed living objects
@@ -503,46 +545,6 @@ impl<'a, T: 'a> Gc<'a, T> {
         }
     }
 
-    /// Returns the contained value, if the `Gc` is alive and has exactly one
-    /// strong reference.
-    ///
-    /// Otherwise, an [`Err`] is returned with the same `Gc` that was passed in.
-    ///
-    /// This will succeed even if there are outstanding weak references.
-    ///
-    /// Requires access to the [`Proxy`] in order to stop tracking the object.
-    ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ters_gc::{Collector, Gc};
-    ///
-    /// let mut col = Collector::new();
-    /// let mut proxy = col.proxy();
-    ///
-    /// let zambia_2016_gdp = proxy.store(19_550_000_000); // USD
-    ///
-    /// let gdp_clone = zambia_2016_gdp.clone();
-    ///
-    /// let gdp_gc_again = Gc::try_unwrap(zambia_2016_gdp, &mut proxy).unwrap_err();
-    ///
-    /// drop(gdp_clone);
-    ///
-    /// let zambia_gdp = Gc::try_unwrap(gdp_gc_again, &mut proxy).unwrap();
-    ///
-    /// assert_eq!(zambia_gdp, 19_550_000_000);
-    /// ```
-    ///
-    /// [`Proxy`]: ../struct.Proxy.html
-    /// [`Err`]: https://doc.rust-lang.org/std/result/enum.Result.html
-    // Not safe in destructor: Allocator::remove dereferences the passed ptr
-    pub fn try_unwrap(this: Self, proxy: &mut Proxy<'a>) -> Result<T, Self> {
-        proxy.collector.try_remove(this)
-    }
 }
 impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
     /// Makes a mutable reference into the given `Gc`.
@@ -608,7 +610,7 @@ impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
         }
     }
 }
-impl<'a, T: 'a> Drop for Gc<'a, T> {
+impl<'a, T: 'a + ?Sized> Drop for Gc<'a, T> {
     /// Drops the `Gc`.
     ///
     /// This will decrement the strong reference count if the inner object
@@ -825,12 +827,12 @@ mod gc_impls {
 /// [`rc::Weak`]: https://doc.rust-lang.org/std/rc/struct.Weak.html
 /// [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
 /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
-pub struct Weak<'arena, T: 'arena> {
+pub struct Weak<'arena, T: 'arena + ?Sized> {
     life_tracker: LifeTracker,
     ptr: GcRef<'arena, T>,
 }
 
-impl<'a, T: 'a> Weak<'a, T> {
+impl<'a, T: 'a + ?Sized> Weak<'a, T> {
     /// Attempts to upgrade the `Weak` pointer to a [`Gc`], preventing the inner
     /// value from being reclaimed if successful.
     ///
@@ -952,7 +954,7 @@ impl<'a, T: 'a> Clone for Weak<'a, T> {
         }
     }
 }
-impl<'a, T: 'a> Drop for Weak<'a, T> {
+impl<'a, T: 'a + ?Sized> Drop for Weak<'a, T> {
     /// Drops the `Weak` pointer.
     fn drop(&mut self) {
         self.decr_weak();
@@ -1105,10 +1107,6 @@ mod tests {
         let _ = *num;
     }
 
-    // #[test]
-    // fn store_unsized_types() {
-    //     // TODO
-    // }
     #[test]
     fn variance_works() {
         // Check compile-test for cases that are illegal
@@ -1396,4 +1394,19 @@ mod tests {
             assert!(Gc::ptr_eq(&err_num_inner, &num_cl));
         }
     }
+    // #[test]
+    // fn store_unsized_types() {
+    //     use std::rc::Rc;
+    //     let val = 42;
+    //
+    //     let r: Rc<Trace> = Rc::new(val);
+    //
+    //     let mut col = Collector::new();
+    //     let mut proxy = col.proxy();
+    //     let r: Gc<Trace>  = proxy.store(val);
+    //     let r: GcRef<Trace> = GcRef {
+    //         _marker: PhantomData,
+    //         ptr: unimplemented!()
+    //     };
+    // }
 }
