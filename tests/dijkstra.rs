@@ -12,8 +12,6 @@ use std::hash::{Hash, Hasher};
 use ters_gc::trace::{Trace, Tracer};
 use ters_gc::*;
 
-// NOTE: Might have problems with SmallVec not clearing values of `remove`d entries
-
 type GcNode<'a> = Gc<'a, Node<'a>>;
 type GcEdge<'a> = Gc<'a, Edge<'a>>;
 
