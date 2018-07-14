@@ -138,11 +138,21 @@ impl<'a, T: 'a + ?Sized> GcRef<'a, T> {
         GcRef { _marker, ptr }
     }
 
+    /// Returns a reference to the inner `GcBox`
+    ///
+    /// #Safety
+    ///
+    /// The box must still be alive.
     unsafe fn gc_box<'t>(&'t self) -> &'t GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid
         self.ptr.as_ref()
     }
+    /// Returns a mutable reference to the inner `GcBox`
+    ///
+    /// #Safety
+    ///
+    /// The box must still be alive.
     unsafe fn gc_box_mut<'t>(&'t mut self) -> &'t mut GcBox<T> {
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid
@@ -425,6 +435,11 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
         unsafe { self.ptr.gc_box() }
     }
 
+    /// Returns a mutable reference to the inner `GcBox`
+    ///
+    /// #Safety
+    ///
+    /// The box must still be alive.
     unsafe fn gc_box_mut(&mut self) -> &mut GcBox<T> {
         assert!(Self::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
@@ -1398,31 +1413,31 @@ mod tests {
         }
     }
 
-    #[test]
-    fn store_unsized_types() {
-        // TODO work on this and ?Sized support
-        use std::rc::Rc;
-        let val = 42;
-
-        let _r: Rc<ToString> = Rc::new(val);
-
-        let gc_box: GcBox<i32> = GcBox::new(val);
-        let boxed_box: Box<GcBox<ToString>> = Box::new(gc_box);
-        let nonnull_box = unsafe { NonNull::new_unchecked(Box::leak(boxed_box)) };
-
-        // let gc_ref: GcRef<Trace> = GcRef::from_raw_nonnull(nonnull_box, PhantomData);
-        let _gc: Gc<ToString> = Gc::from_raw_nonnull(nonnull_box, PhantomData);
-
-// pub(crate) struct GcRef<'arena, T: 'arena + ?Sized> {
-//     _marker: PhantomData<&'arena T>,
-//     ptr: NonNull<GcBox<T>>,
-// }
-        let mut col = Collector::new();
-        let mut _proxy = col.proxy();
-        // let stored_gc: Gc<ToString>  = proxy.store(val);
-        // let r: GcRef<Trace> = GcRef {
-        //     _marker: PhantomData,
-        //     ptr: unimplemented!()
-        // };
-    }
+//     #[test]
+//     fn store_unsized_types() {
+//         // TODO work on this and ?Sized support
+//         use std::rc::Rc;
+//         let val = 42;
+//
+//         let _r: Rc<ToString> = Rc::new(val);
+//
+//         let gc_box: GcBox<i32> = GcBox::new(val);
+//         let boxed_box: Box<GcBox<ToString>> = Box::new(gc_box);
+//         let nonnull_box = unsafe { NonNull::new_unchecked(Box::leak(boxed_box)) };
+//
+//         // let gc_ref: GcRef<Trace> = GcRef::from_raw_nonnull(nonnull_box, PhantomData);
+//         let _gc: Gc<ToString> = Gc::from_raw_nonnull(nonnull_box, PhantomData);
+//
+// // pub(crate) struct GcRef<'arena, T: 'arena + ?Sized> {
+// //     _marker: PhantomData<&'arena T>,
+// //     ptr: NonNull<GcBox<T>>,
+// // }
+//         let mut col = Collector::new();
+//         let mut _proxy = col.proxy();
+//         // let stored_gc: Gc<ToString>  = proxy.store(val);
+//         // let r: GcRef<Trace> = GcRef {
+//         //     _marker: PhantomData,
+//         //     ptr: unimplemented!()
+//         // };
+//     }
 }
