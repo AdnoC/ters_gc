@@ -66,8 +66,8 @@ impl<T: ?Sized> GcBox<T> {
     pub fn borrow(&self) -> &T {
         &self.val
     }
-    // Unsfe due to stronger requirements than `borrow`, that it should be
-    // the only active reference.
+    /// Unsfe due to stronger requirements than `borrow`, that it should be
+    /// the only active reference.
     pub unsafe fn borrow_mut(&mut self) -> &mut T {
         &mut self.val
     }
