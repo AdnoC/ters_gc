@@ -325,7 +325,7 @@ impl Collector {
             .allocator
             .items
             .values()
-            .filter(|info| Self::is_object_reachable(info));
+            .filter(|info| Collector::is_object_reachable(info));
 
         // Mark roots reachable and mark all their children reachable
         for info in roots {
@@ -379,7 +379,7 @@ impl Collector {
     fn sweep(&mut self) {
         let mut unreachable_objects = vec![];
         for info in self.allocator.items.values() {
-            if !Self::is_object_reachable(info) {
+            if !Collector::is_object_reachable(info) {
                 unreachable_objects.push(info.ptr);
             } else {
                 info.unmark();

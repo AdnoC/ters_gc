@@ -120,7 +120,7 @@ impl LifeTracker {
     }
 }
 impl Clone for LifeTracker {
-    fn clone(&self) -> Self {
+    fn clone(&self) -> LifeTracker {
         LifeTracker(self.0.clone())
     }
 }
@@ -357,7 +357,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// [`is_alive`]: #method.is_alive
     /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
     pub fn get(this: &Self) -> Option<&T> {
-        if Self::is_alive(this) {
+        if Gc::is_alive(this) {
             Some(this.gc_box().borrow())
         } else {
             None
@@ -413,7 +413,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// [`None`]: https://doc.rust-lang.org/std/option/enum.Option.html#variant.None
     /// [`clone`]: https://doc.rust-lang.org/std/clone/trait.Clone.html#tymethod.clone
     pub fn get_mut(this: &mut Self) -> Option<&mut T> {
-        if Self::is_alive(this) && Self::strong_count(this) == 1 && Self::weak_count(this) == 0 {
+        if Gc::is_alive(this) && Gc::strong_count(this) == 1 && Gc::weak_count(this) == 0 {
             // This `Gc` is garunteed to be the sole strong reference to the data.
             // So, we can safely get a mut reference to the `GcBox` since there
             // is nobody else who can who can access the data.
@@ -428,7 +428,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     }
 
     fn gc_box(&self) -> &GcBox<T> {
-        assert!(Self::is_alive(self));
+        assert!(Gc::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid (unless we are in the `sweep` phase, in which case
         // this isn't called when dead).
@@ -441,7 +441,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     ///
     /// The box must still be alive.
     unsafe fn gc_box_mut(&mut self) -> &mut GcBox<T> {
-        assert!(Self::is_alive(self));
+        assert!(Gc::is_alive(self));
         // This is fine because as long as there is a Gc the pointer to the data
         // should be valid (unless we are in the `sweep` phase, in which case
         // this isn't called when dead).
@@ -552,11 +552,11 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     }
 
     fn get_borrow(&self) -> &T {
-        Self::get(self).expect("gc pointer was already dead")
+        Gc::get(self).expect("gc pointer was already dead")
     }
 
     pub(crate) fn box_ptr(&self) -> Option<NonNull<GcBox<T>>> {
-        if Self::is_alive(self) {
+        if Gc::is_alive(self) {
             Some(self.ptr.ptr)
         } else {
             None
@@ -672,7 +672,7 @@ impl<'a, T: 'a + ?Sized> Drop for Gc<'a, T> {
     /// proxy.run(); // Prints "dropped!"
     /// ```
     fn drop(&mut self) {
-        if Self::is_alive(self) {
+        if Gc::is_alive(self) {
             self.decr_ref();
         }
     }
@@ -714,7 +714,7 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
     /// five.clone();
     /// ```
     fn clone(&self) -> Self {
-        if !Self::is_alive(self) {
+        if !Gc::is_alive(self) {
             panic!("gc pointer was already dead");
         }
         self.incr_ref();
@@ -741,7 +741,7 @@ mod gc_impls {
         ///
         /// Safe to use in destructors.
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            match Self::get(self) {
+            match Gc::get(self) {
                 Some(value) => f.debug_struct("Gc").field("value", value).finish(),
                 None => {
                     struct DeadPlaceholder;
