@@ -280,7 +280,6 @@ const _SAN: &str = "San Diego";
 
 #[test]
 fn dijkstra_is_cool() {
-
     let mut col = Collector::new();
     let mut proxy = col.proxy();
     let mut graph = Graph::new();

@@ -291,7 +291,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
-    /// 
+    ///
     /// let dk_high_score = proxy.store(1_247_700);
     ///
     /// let score_ref = Gc::get(&dk_high_score).unwrap();
@@ -1151,19 +1151,31 @@ mod tests {
         }
 
         fn _contravariant_with_gc() {
-            fn _expect<'a, 'g>(_: &'a i32, gc: Gc<'g, &'static i32>) -> Gc<'g, &'a i32> { gc }
+            fn _expect<'a, 'g>(_: &'a i32, gc: Gc<'g, &'static i32>) -> Gc<'g, &'a i32> {
+                gc
+            }
         }
         fn _contravariant_with_weak() {
-            fn _expect<'a, 'g>(_: &'a i32, wk: Weak<'g, &'static i32>) -> Weak<'g, &'a i32> { wk }
+            fn _expect<'a, 'g>(_: &'a i32, wk: Weak<'g, &'static i32>) -> Weak<'g, &'a i32> {
+                wk
+            }
         }
 
         fn _gc_contravariant_alloc_lifetime() {
-            fn _provide() -> Gc<'static, ()> { unimplemented!() }
-            fn _expect<'a>(_: &'a i32) -> Gc<'a, ()> { _provide() }
+            fn _provide() -> Gc<'static, ()> {
+                unimplemented!()
+            }
+            fn _expect<'a>(_: &'a i32) -> Gc<'a, ()> {
+                _provide()
+            }
         }
         fn _weak_contravariant_alloc_lifetime() {
-            fn _provide() -> Weak<'static, ()> { unimplemented!() }
-            fn _expect<'a>(_: &'a i32) -> Weak<'a, ()> { _provide() }
+            fn _provide() -> Weak<'static, ()> {
+                unimplemented!()
+            }
+            fn _expect<'a>(_: &'a i32) -> Weak<'a, ()> {
+                _provide()
+            }
         }
     }
 
@@ -1353,7 +1365,6 @@ mod tests {
         let removed_num = Gc::try_unwrap(num, &mut proxy);
         let ok_num = removed_num.unwrap();
         assert_eq!(42, ok_num);
-
 
         let num = proxy.store(42);
         let weak_1 = Gc::downgrade(&num);

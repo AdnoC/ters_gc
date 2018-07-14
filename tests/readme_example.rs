@@ -1,7 +1,7 @@
 extern crate ters_gc;
 
-use ters_gc::{Collector, Gc, trace};
 use std::cell::RefCell;
+use ters_gc::{trace, Collector, Gc};
 
 // A struct that can hold references to itself
 struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);

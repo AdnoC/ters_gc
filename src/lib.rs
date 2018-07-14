@@ -194,7 +194,6 @@
 
 // Keep the version number in sync with crate version
 #![doc(html_root_url = "https://docs.rs/ters_gc/0.1.0")]
-
 #![deny(
     missing_docs,
     missing_debug_implementations,
@@ -685,7 +684,7 @@ mod tests {
         use std::mem::drop;
         let mut col = Collector::new();
         let mut proxy = col.proxy();
-        
+
         for i in 0..60 {
             let num = proxy.store(i);
             assert_eq!(*num, i);
@@ -933,16 +932,16 @@ mod tests {
         let factor2 = proxy.collector.sweep_factor;
         assert_eq!(factor2, 0.9);
     }
-//    /// # use std::error::Error;
-//    /// #
-//    /// # fn try_main() -> Result<(), Box<Error>> {
-//    /// <PUT CODE HERE>
-//    /// #
-//    /// #     Ok(())
-//    /// # }
-//    /// #
-//    /// # fn main() {
-//    /// #     try_main().unwrap();
-//    /// # }
+    //    /// # use std::error::Error;
+    //    /// #
+    //    /// # fn try_main() -> Result<(), Box<Error>> {
+    //    /// <PUT CODE HERE>
+    //    /// #
+    //    /// #     Ok(())
+    //    /// # }
+    //    /// #
+    //    /// # fn main() {
+    //    /// #     try_main().unwrap();
+    //    /// # }
 
 }
