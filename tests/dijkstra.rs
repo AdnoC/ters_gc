@@ -1,9 +1,7 @@
 extern crate priority_queue;
-extern crate smallvec;
 extern crate ters_gc;
 
 use priority_queue::PriorityQueue;
-use smallvec::SmallVec;
 use std::cell::RefCell;
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
@@ -17,7 +15,7 @@ type GcEdge<'a> = Gc<'a, Edge<'a>>;
 
 #[derive(Default)]
 struct Graph<'a> {
-    nodes: SmallVec<[GcNode<'a>; 16]>,
+    nodes: Vec<GcNode<'a>>,
 }
 
 impl<'a> Graph<'a> {
@@ -26,9 +24,8 @@ impl<'a> Graph<'a> {
     }
 
     fn new_node(&mut self, proxy: &mut Proxy<'a>, name: &'static str) -> GcNode<'a> {
-        assert!(self.nodes.len() < self.nodes.inline_size() - 1);
         let node = Node {
-            adjacencies: RefCell::new(SmallVec::new()),
+            adjacencies: RefCell::new(Vec::new()),
             name,
         };
         let node = proxy.store(node);
@@ -57,7 +54,7 @@ impl<'a> Graph<'a> {
         self.nodes.iter().find(|node| node.name == name).cloned()
     }
 
-    fn path_for(&self, src: GcNode<'a>, dest: GcNode<'a>) -> Option<SmallVec<[GcNode<'a>; 16]>> {
+    fn path_for(&self, src: GcNode<'a>, dest: GcNode<'a>) -> Option<Vec<GcNode<'a>>> {
         // Want lower distance -> higher priority
         fn dist_to_priority(distance: u64) -> u64 {
             std::u64::MAX - distance
@@ -107,7 +104,7 @@ impl<'a> Graph<'a> {
             return None;
         }
 
-        let mut path = SmallVec::new();
+        let mut path = Vec::new();
         path.push(dest);
         loop {
             if let Some(node) = prev_in_path.get(path.last().unwrap()) {
@@ -124,13 +121,12 @@ impl<'a> Graph<'a> {
 
 #[derive(Default, Clone)]
 struct Node<'a> {
-    adjacencies: RefCell<SmallVec<[GcEdge<'a>; 16]>>,
+    adjacencies: RefCell<Vec<GcEdge<'a>>>,
     name: &'static str,
 }
 
 impl<'a> Node<'a> {
     fn connect_to(&self, proxy: &mut Proxy<'a>, dest: GcNode<'a>, weight: u32) {
-        assert!(self.adjacencies.borrow().len() < self.adjacencies.borrow().inline_size() - 1);
         let edge = proxy.store(Edge { dest, weight });
         self.adjacencies.borrow_mut().push(edge);
     }
@@ -170,7 +166,7 @@ fn connect_bidirectional<'a>(proxy: &mut Proxy<'a>, a: GcNode<'a>, b: GcNode<'a>
 
 impl<'a> fmt::Debug for Node<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        struct AdjWrapper<'b, 'a: 'b>(&'b RefCell<SmallVec<[GcEdge<'a>; 16]>>);
+        struct AdjWrapper<'b, 'a: 'b>(&'b RefCell<Vec<GcEdge<'a>>>);
         impl<'a, 'b> fmt::Debug for AdjWrapper<'a, 'b> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 f.debug_list().entries(self.0.borrow().iter()).finish()
