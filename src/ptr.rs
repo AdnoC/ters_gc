@@ -190,8 +190,7 @@ impl<'a, T: 'a + ?Sized> Clone for GcRef<'a, T> {
 /// Dereferencing a `Gc` inside a destructor ([`drop`]) can lead
 /// to undefined behavior. If you must do so, either check that the `Gc` is still
 /// alive with [`Gc::is_alive`][is_alive] first, or use dereference it using
-/// [`Gc::get`][get]. The safety of a method's use inside a destructor is noted
-/// in its doc comment.
+/// [`Gc::get`][get].
 ///
 /// `Gc` does not generally allow access to mutable references to the inner value.
 /// Put a [`Cell`] or [`RefCell`] inside the `Gc` if you need mutability.
@@ -239,10 +238,6 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// This will succeed even if there are outstanding weak references.
     ///
     /// Requires access to the [`Proxy`] in order to stop tracking the object.
-    ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -307,10 +302,6 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// Allows you to check in destructors that the data a `Gc` point to has
     /// not already been reclaimed.
     ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors.
-    ///
     /// # Examples
     ///
     /// ```
@@ -334,10 +325,6 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     ///
     /// Can be used in destructors to obtain a reference to the pointed-to object
     /// if it is still valid.
-    ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -372,10 +359,6 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// object or it is not safe to mutate a shared value.
     ///
     /// See also [`make_mut`], which will [`clone`] the inner value when it's shared.
-    ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -430,6 +413,15 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
         // this isn't called when dead).
         unsafe { self.ptr.gc_box() }
     }
+    fn gc_box_checked(&self) -> &GcBox<T> {
+        if !Gc::is_alive(self) {
+            panic!("gc pointer was dead");
+        }
+        // This is fine because as long as there is a Gc the pointer to the data
+        // should be valid (unless we are in the `sweep` phase, in which case
+        // this isn't called when dead).
+        unsafe { self.ptr.gc_box() }
+    }
 
     /// Returns a mutable reference to the inner `GcBox`
     ///
@@ -445,10 +437,6 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     }
 
     /// Creates a new [`Weak`] pointer to this value.
-    ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -475,9 +463,10 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
 
     /// Get the number of strong (`Gc`) pointers to this value.
     ///
-    /// # Safety
+    /// # Panics
     ///
-    /// **Not** safe to use in destructors.
+    /// Panics if the inner object has already been freed ([`is_alive`] returns
+    /// `false`).
     ///
     /// # Examples
     ///
@@ -492,15 +481,18 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     ///
     /// assert_eq!(Gc::strong_count(&months), 2);
     /// ```
+    ///
+    /// [`is_alive`]: #method.is_alive
     pub fn strong_count(this: &Gc<'a, T>) -> usize {
-        Gc::gc_box(this).strong_count()
+        Gc::gc_box_checked(this).strong_count()
     }
 
     /// Gets the number of [`Weak`] pointers to this value.
     ///
-    /// # Safety
+    /// # Panics
     ///
-    /// **Not** safe to use in destructors.
+    /// Panics if the inner object has already been freed ([`is_alive`] returns
+    /// `false`).
     ///
     /// # Examples
     ///
@@ -516,18 +508,15 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// assert_eq!(Gc::weak_count(&days_in_year), 1);
     /// ```
     ///
+    /// [`is_alive`]: #method.is_alive
     /// [`Weak`]: struct.Weak.html
     pub fn weak_count(this: &Gc<'a, T>) -> usize {
-        Gc::gc_box(this).weak_count()
+        Gc::gc_box_checked(this).weak_count()
     }
 
 
     /// Returns `true` if the two `Gc`s point to the same value
     /// (not just values that compare as equal).
-    ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors.
     ///
     /// # Examples
     ///
@@ -582,13 +571,9 @@ impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
     ///
     /// See also [`get_mut`], which will fail rather than cloning.
     ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors (due to the panic).
-    ///
     /// # Panics
     ///
-    /// Panics if the inner object has already been freed ([`is_alive`] is
+    /// Panics if the inner object has already been freed ([`is_alive`] returns
     /// `false`).
     ///
     /// # Examples
@@ -644,10 +629,6 @@ impl<'a, T: 'a + ?Sized> Drop for Gc<'a, T> {
     /// The inner value is only `drop`ped when the object is reclaimed when
     /// the gc is run.
     ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors.
-    ///
     /// # Examples
     ///
     /// ```
@@ -698,13 +679,9 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
     /// This creates another pointer to the same inner value, increasing the
     /// strong reference count.
     ///
-    /// # Safety
-    ///
-    /// Safe to use in destructors (due to the panic).
-    ///
     /// # Panics
     ///
-    /// Panics if the inner object has already been freed ([`is_alive`] is
+    /// Panics if the inner object has already been freed ([`is_alive`] returns
     /// `false`).
     ///
     /// [`is_alive`]: #method.is_alive
@@ -720,6 +697,8 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
     /// let five = proxy.store(5);
     /// five.clone();
     /// ```
+    ///
+    /// [`is_alive`]: #method.is_alive
     fn clone(&self) -> Self {
         if !Gc::is_alive(self) {
             panic!("gc pointer was already dead");
@@ -742,11 +721,6 @@ mod gc_impls {
     use std::hash::{Hash, Hasher};
 
     impl<'a, T: 'a + fmt::Debug> fmt::Debug for Gc<'a, T> {
-        /// Formats the value using the given formatter.
-        ///
-        /// # Safety
-        ///
-        /// Safe to use in destructors.
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match Gc::get(self) {
                 Some(value) => f.debug_struct("Gc").field("value", value).finish(),
