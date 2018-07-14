@@ -945,9 +945,4 @@ mod tests {
 //    /// #     try_main().unwrap();
 //    /// # }
 
-    #[test]
-fn gc_contravariant() {
-    fn provide<'g>() -> Gc<'g, &'static i32> { unimplemented!() }
-    fn expect<'a>(_: &'a i32) -> Gc<&'a i32> { provide() }
-}
 }

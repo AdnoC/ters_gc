@@ -1121,7 +1121,6 @@ mod tests {
                 _expect(&val, m);
             }
         }
-
         fn _covariant_with_weak() {
             fn _expect<'a>(_: &'a i32, _: Weak<&'a i32>) {
                 unimplemented!()
@@ -1132,12 +1131,39 @@ mod tests {
             }
         }
 
-        fn _contravariant_with_gc() {
-            fn expect<'a, 'g>(_: &'a i32, gc: Gc<'g, &'static i32>) -> Gc<'g, &'a i32> { gc }
+        fn _covariant_with_gc_alloc_lifetime() {
+            fn _expect<'a>(_: &'a i32, _: Gc<'a, ()>) {
+                unimplemented!()
+            }
+            fn _provide(m: Gc<'static, ()>) {
+                let val = 13;
+                _expect(&val, m);
+            }
+        }
+        fn _covariant_with_weak_alloc_lifetime() {
+            fn _expect<'a>(_: &'a i32, _: Weak<'a, ()>) {
+                unimplemented!()
+            }
+            fn _provide(m: Weak<'static, ()>) {
+                let val = 13;
+                _expect(&val, m);
+            }
         }
 
+        fn _contravariant_with_gc() {
+            fn _expect<'a, 'g>(_: &'a i32, gc: Gc<'g, &'static i32>) -> Gc<'g, &'a i32> { gc }
+        }
         fn _contravariant_with_weak() {
-            fn expect<'a, 'g>(_: &'a i32, wk: Weak<'g, &'static i32>) -> Weak<'g, &'a i32> { wk }
+            fn _expect<'a, 'g>(_: &'a i32, wk: Weak<'g, &'static i32>) -> Weak<'g, &'a i32> { wk }
+        }
+
+        fn _gc_contravariant_alloc_lifetime() {
+            fn _provide() -> Gc<'static, ()> { unimplemented!() }
+            fn _expect<'a>(_: &'a i32) -> Gc<'a, ()> { _provide() }
+        }
+        fn _weak_contravariant_alloc_lifetime() {
+            fn _provide() -> Weak<'static, ()> { unimplemented!() }
+            fn _expect<'a>(_: &'a i32) -> Weak<'a, ()> { _provide() }
         }
     }
 
