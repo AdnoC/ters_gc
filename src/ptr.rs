@@ -125,6 +125,7 @@ impl Clone for LifeTracker {
     }
 }
 
+/// Lifetime-restricted pointer to a `GcBox`
 pub(crate) struct GcRef<'arena, T: 'arena> {
     _marker: PhantomData<&'arena T>,
     ptr: NonNull<GcBox<T>>,
