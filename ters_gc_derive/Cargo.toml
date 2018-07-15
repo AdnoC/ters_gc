@@ -11,3 +11,5 @@ proc-macro = true
 synstructure = "0.9.0"
 quote = "0.6.3"
 
+[dev-dependencies.ters_gc]
+path = ".."
