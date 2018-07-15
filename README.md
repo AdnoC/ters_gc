@@ -83,12 +83,6 @@ cannot dereference any `Gc`s it contains. So if you *never* plan on storing
 something in the gc heap it is safe to dereference a `Gc` in the destructor,
 but **make sure** you aren't going to store it.
 
-As a general rule of thumb, if a type implements `Trace`, it shouldn't
-dereference any `Gc`s in its destructor.
-
-The order objects are destroyed during collection might be changed in future
-verstions, so you should not rely on order to "safely" access data through `Gc`s.
-
 If you absolutely **must** dereference a `Gc` in a destructor, you either have to
 first check `Gc::is_alive` or access using `Gc::get` (which checks that
 it is alive).
@@ -106,7 +100,7 @@ in the heap that the user has a way of reaching (like through a
 
 ## The garbage collector is for single threaded use only
 
-None of the pointer types, nor `Proxy` should be
+Nothing should be
 [`Sync`](https://doc.rust-lang.org/std/marker/trait.Sync.html) or
 [`Send`](https://doc.rust-lang.org/std/marker/trait.Send.html).
 
