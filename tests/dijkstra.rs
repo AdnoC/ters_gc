@@ -346,7 +346,6 @@ fn dijkstra_is_cool() {
             dtw.disconnect_from(atl.clone());
             jfk.disconnect_from(atl.clone());
 
-
             // Remove the airports themselves from the list
             graph.remove_node_by_name(IAH);
             graph.remove_node_by_name(ATL);

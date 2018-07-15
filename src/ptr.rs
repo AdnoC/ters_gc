@@ -514,7 +514,6 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
         Gc::gc_box_checked(this).weak_count()
     }
 
-
     /// Returns `true` if the two `Gc`s point to the same value
     /// (not just values that compare as equal).
     ///
@@ -557,8 +556,6 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     pub(crate) fn nonnull_box_ptr(&self) -> NonNull<GcBox<T>> {
         self.ptr.ptr
     }
-
-
 }
 impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
     /// Makes a mutable reference into the given `Gc`.
@@ -897,7 +894,6 @@ impl<'a, T: 'a + ?Sized> Weak<'a, T> {
             None
         }
     }
-
 
     fn get(&self) -> Option<&T> {
         if self.is_alive() {
@@ -1395,31 +1391,31 @@ mod tests {
         }
     }
 
-//     #[test]
-//     fn store_unsized_types() {
-//         // TODO work on this and ?Sized support
-//         use std::rc::Rc;
-//         let val = 42;
-//
-//         let _r: Rc<ToString> = Rc::new(val);
-//
-//         let gc_box: GcBox<i32> = GcBox::new(val);
-//         let boxed_box: Box<GcBox<ToString>> = Box::new(gc_box);
-//         let nonnull_box = unsafe { NonNull::new_unchecked(Box::leak(boxed_box)) };
-//
-//         // let gc_ref: GcRef<Trace> = GcRef::from_raw_nonnull(nonnull_box, PhantomData);
-//         let _gc: Gc<ToString> = Gc::from_raw_nonnull(nonnull_box, PhantomData);
-//
-// // pub(crate) struct GcRef<'arena, T: 'arena + ?Sized> {
-// //     _marker: PhantomData<&'arena T>,
-// //     ptr: NonNull<GcBox<T>>,
-// // }
-//         let mut col = Collector::new();
-//         let mut _proxy = col.proxy();
-//         // let stored_gc: Gc<ToString>  = proxy.store(val);
-//         // let r: GcRef<Trace> = GcRef {
-//         //     _marker: PhantomData,
-//         //     ptr: unimplemented!()
-//         // };
-//     }
+    //     #[test]
+    //     fn store_unsized_types() {
+    //         // TODO work on this and ?Sized support
+    //         use std::rc::Rc;
+    //         let val = 42;
+    //
+    //         let _r: Rc<ToString> = Rc::new(val);
+    //
+    //         let gc_box: GcBox<i32> = GcBox::new(val);
+    //         let boxed_box: Box<GcBox<ToString>> = Box::new(gc_box);
+    //         let nonnull_box = unsafe { NonNull::new_unchecked(Box::leak(boxed_box)) };
+    //
+    //         // let gc_ref: GcRef<Trace> = GcRef::from_raw_nonnull(nonnull_box, PhantomData);
+    //         let _gc: Gc<ToString> = Gc::from_raw_nonnull(nonnull_box, PhantomData);
+    //
+    // // pub(crate) struct GcRef<'arena, T: 'arena + ?Sized> {
+    // //     _marker: PhantomData<&'arena T>,
+    // //     ptr: NonNull<GcBox<T>>,
+    // // }
+    //         let mut col = Collector::new();
+    //         let mut _proxy = col.proxy();
+    //         // let stored_gc: Gc<ToString>  = proxy.store(val);
+    //         // let r: GcRef<Trace> = GcRef {
+    //         //     _marker: PhantomData,
+    //         //     ptr: unimplemented!()
+    //         // };
+    //     }
 }
