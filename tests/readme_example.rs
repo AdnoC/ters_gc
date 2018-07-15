@@ -1,18 +1,14 @@
 extern crate ters_gc;
+#[macro_use]
+extern crate ters_gc_derive;
 
 use std::cell::RefCell;
-use ters_gc::{trace, Collector, Gc};
+use ters_gc::{Collector, Gc};
 
+// Allow it to be stored in the gc heap
+#[derive(Trace)]
 // A struct that can hold references to itself
 struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);
-
-// All things in the gc heap need to impl `Trace`
-impl<'a> trace::Trace for CyclicStruct<'a> {
-    fn trace(&self, tracer: &mut trace::Tracer) {
-        // Tell the tracer where to find our gc pointer
-        tracer.add_target(&self.0);
-    }
-}
 
 impl<'a> Drop for CyclicStruct<'a> {
     fn drop(&mut self) {
