@@ -169,6 +169,13 @@
 //! find all of them it assumes the ones it can't find are on the stack or somewhere
 //! in the heap that the user has a way of reaching (like through a [`Box`]).
 //!
+//! ## Do not mix-and-match [`Gc`]s from different [`Collector`]s
+//!
+//! Each [`Collector`] only knows about [`Gc`]s it gave out.
+//!
+//! If you allocate two [`Gc`]s from two different [`Collector`]s and have them
+//! reference each other, you will leak them.
+//!
 //! ## The garbage collector is for single threaded use only
 //!
 //! None of the pointer types, nor [`Proxy`] should be [`Sync`] or [`Send`].

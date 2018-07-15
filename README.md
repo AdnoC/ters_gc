@@ -98,6 +98,13 @@ find all of them it assumes the ones it can't find are on the stack or somewhere
 in the heap that the user has a way of reaching (like through a
 [`Box`](https://doc.rust-lang.org/std/boxed/struct.Box.html)).
 
+## Do not mix-and-match `Gc`s from different `Collector`s
+
+Each `Collector` only knows about `Gc`s it gave out.
+
+If you allocate two `Gc`s from two different `Collector`s and have them
+reference each other, you will leak them.
+
 ## The garbage collector is for single threaded use only
 
 Nothing should be
