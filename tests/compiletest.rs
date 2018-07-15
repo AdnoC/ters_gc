@@ -12,7 +12,10 @@ fn run_mode(mode: &'static str) {
     config.src_base = PathBuf::from(format!("tests/{}", mode));
     config.link_deps(); // Populate config.target_rustcflags with dependencies on the path
                         // Correctly link deps. Above line errors with "multiple input filenames provided"
-                        // config.target_rustcflags = Some("-L target/debug/ -L target/debug/deps/".to_owned());
+
+    // config.target_rustcflags = Some("-L target/debug/ -L target/debug/deps/".to_owned());
+    // The above line has problems when the crate has been compiled
+    // by both nightly and stable.
     config.target_rustcflags = Some("-L target/debug/deps/".to_owned());
     config.clean_rmeta(); // If your tests import the parent crate, this helps with E0464
 
