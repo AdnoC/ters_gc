@@ -13,110 +13,109 @@
 //!
 //! # Examples
 //!
-//!
-//!
-//! Implementing manually for a large, complex struct:
+//! You can `#[derive(Trace)]` for a default implementation.
 //!
 //! ```
-//! use ters_gc::{Collector, Proxy};
+//! extern crate ters_gc;
+//! #[macro_use] extern crate ters_gc_derive;
+//!
+//! use ters_gc::{Collector, Gc};
+//!
+//! #[derive(Trace)]
+//! struct LinkedList<'a> {
+//!     next: Option<Gc<'a, LinkedList<'a>>>,
+//!     data: i32,
+//! }
+//!
+//! let mut col = Collector::new();
+//! let mut proxy = col.proxy();
+//!
+//! let tail = proxy.store(LinkedList {
+//!     next: None,
+//!     data: 0
+//! });
+//!
+//! let head = proxy.store(LinkedList {
+//!     next: Some(tail),
+//!     data: 0
+//! });
+//! ```
+//!
+//! Or implement it manually.
+//!
+//! ```
+//! use ters_gc::{Collector, Gc};
 //! use ters_gc::trace::{Trace, Tracer};
-//! use ters_gc::ptr::{Gc, Weak};
 //!
-//! use std::sync::Arc;
-//! use std::cell::RefCell;
-//! use std::time::Instant;
-//! use std::ffi::OsString;
-//!
-//!
-//! // Newtype that just prints a message whenever it is traced
-//! struct TracePrinter<T: Trace>(T);
-//! impl<T: Trace> Trace for TracePrinter<T> {
-//!     fn trace(&self, tracer: &mut Tracer) {
-//!         println!("trace occurred!");
-//!         // Forward the trace to the inner type
-//!         tracer.add_target(&self.0);
-//!     }
+//! struct LinkedList<'a> {
+//!     next: Option<Gc<'a, LinkedList<'a>>>,
+//!     data: i32,
 //! }
 //!
-//! // Complex data structure.
-//! // Has 4 members that can contain `Gc`s
-//! struct BigComplexThing<'a> {
-//!     name: TracePrinter<Gc<'a, OsString>>,
-//!     description: String,
-//!     root_obj: Arc<RefCell<Option<TracePrinter<Gc<'a, i32>>>>>,
-//!     timestamp: TracePrinter<Gc<'a, Instant>>,
-//!     children: RefCell<Vec<TracePrinter<Gc<'a, i32>>>>,
-//!     a_number: i32,
-//! }
-//!
-//! impl<'a> Trace for BigComplexThing<'a> {
+//! impl<'a> Trace for LinkedList<'a> {
 //!     fn trace(&self, tracer: &mut Tracer) {
-//!         // Call `add_target` on all members containing `Gc`s
-//!         tracer.add_target(&self.name);
-//!         tracer.add_target(&self.root_obj);
-//!         tracer.add_target(&self.timestamp);
-//!         tracer.add_target(&self.children);
+//!         tracer.add_target(&self.next);
 //!     }
 //! }
 //!
 //! let mut col = Collector::new();
 //! let mut proxy = col.proxy();
 //!
-//! let bct_stack = BigComplexThing {
-//!     name: TracePrinter(proxy.store(OsString::new())),
-//!     description: "default description".to_string(),
-//!     root_obj: Arc::new(RefCell::new(None)),
-//!     timestamp: TracePrinter(proxy.store(Instant::now())),
-//!     children: RefCell::new(Vec::new()),
-//!     a_number: 0,
-//! };
+//! let tail = proxy.store(LinkedList {
+//!     next: None,
+//!     data: 0
+//! });
 //!
-//! let mut bct = proxy.store(TracePrinter(bct_stack));
+//! let head = proxy.store(LinkedList {
+//!     next: Some(tail),
+//!     data: 0
+//! });
+//! ```
 //!
-//! println!("Running");
-//! proxy.run(); // Prints "trace occurred!" 3*N times
-//!              // (where N is the number of traces per collection run)
+//! # Excluding fields when deriving
 //!
-//! println!("Adding more");
+//! When deriving [`Trace`], all fields of the struct/enum must also implement
+//! [`Trace`]. You can manually mark fields as non-targets of a trace with
+//! the attribute `#[ignore_trace]`.
 //!
-//! // 2-step process. First make the Gc, then store it.
-//! // Otherwise we might start automatic collection when we store the `0`.
-//! // If that happens, we'll panic because we borrowed `children`
-//! // in order to push the entry, but the trace will also try to
-//! // borrow it.
-//! for _ in 0..3 {
-//!     let entry = TracePrinter(proxy.store(0));
-//!     bct.0.children.borrow_mut().push(entry);
+//! ```
+//! extern crate ters_gc;
+//! #[macro_use] extern crate ters_gc_derive;
+//!
+//! use ters_gc::{Collector, Gc};
+//!
+//! // Notice that this doesn't implement `Trace`
+//! struct NoTrace;
+//!
+//! #[derive(Trace)]
+//! struct DoesTrace<'a> {
+//!     #[ignore_trace]
+//!     ignore1: NoTrace,
+//!
+//!     thing_to_trace: Option<Gc<'a, fn(i32, i32) -> i64>>,
+//!
+//!     #[ignore_trace]
+//!     ignore2: NoTrace,
+//!
+//!     doesnt_matter: bool,
+//!
+//!     also_trace_this: Vec<Gc<'a, DoesTrace<'a>>>,
 //! }
-//!
-//! println!("Running again");
-//! proxy.run(); // Prints "trace occurred!" 6*N times
-//!
-//! println!("Setting root");
-//! let entry = TracePrinter(proxy.store(0));
-//! *bct.0.root_obj.borrow_mut() = Some(entry);
-//!
-//! println!("Running once more");
-//! proxy.run(); // Prints "trace occurred!" 7*N times
-//! ```
-//!
-//! [`Trace`] has a default implementation for structs that don't contain
-//! any [`Gc`] pointers
-//!
-//! ```
-//! use ters_gc::Collector;
-//! use ters_gc::trace::Trace;
-//!
-//! struct I32Newtype(i32);
-//!
-//! // Give `I32Newtype` a noop implementation
-//! impl Trace for I32Newtype {}
+//! 
 //!
 //! let mut col = Collector::new();
 //! let mut proxy = col.proxy();
 //!
-//! proxy.store(I32Newtype(22));
+//! proxy.store(DoesTrace {
+//!     ignore1: NoTrace,
+//!     thing_to_trace: None,
+//!     ignore2: NoTrace,
+//!     doesnt_matter: false,
+//!     also_trace_this: Vec::new(),
+//! });
 //! ```
+//!
+//!
 //!
 //!
 //!
@@ -142,10 +141,7 @@ pub trait Trace {
     /// Tell the tracer about [`Gc`] pointers
     ///
     /// [`Gc`]: ../ptr/struct.Gc.html
-    #[inline]
-    fn trace(&self, _tracer: &mut Tracer) {
-        // noop
-    }
+    fn trace(&self, _tracer: &mut Tracer);
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -181,6 +177,8 @@ impl<'a, T> Trace for Gc<'a, T> {
     }
 }
 impl<'a, T> Trace for Weak<'a, T> {
+    /// Noop
+    #[inline]
     fn trace(&self, _: &mut Tracer) {
         // noop
     }
@@ -198,6 +196,7 @@ mod trace_impls {
             $(
                 impl Trace for $T {
                     /// Noop
+                    #[inline]
                     fn trace(&self, _: &mut Tracer) {
                         // noop
                     }
@@ -234,6 +233,7 @@ mod trace_impls {
     }
     impl<'a> Trace for &'a str {
         /// Noop
+        #[inline]
         fn trace(&self, _: &mut Tracer) {
             // noop
         }
@@ -242,6 +242,7 @@ mod trace_impls {
         ($($T:tt)*) => {
             impl<$($T,)* R> Trace for fn($($T),*) -> R {
                 /// Noop
+                #[inline]
                 fn trace(&self, _: &mut Tracer) {
                     // noop
                 }
@@ -255,12 +256,14 @@ mod trace_impls {
     noop_fn_impl!(Q W E T);
     impl<T: ?Sized> Trace for *const T {
         /// Noop
+        #[inline]
         fn trace(&self, _: &mut Tracer) {
             // noop
         }
     }
     impl<T: ?Sized> Trace for *mut T {
         /// Noop
+        #[inline]
         fn trace(&self, _: &mut Tracer) {
             // noop
         }
@@ -268,6 +271,7 @@ mod trace_impls {
 
     impl<'a, T: Trace> Trace for [T] {
         /// Traces each element
+        #[inline]
         fn trace(&self, tracer: &mut Tracer) {
             for tracee in self.iter() {
                 tracer.add_target(tracee);
@@ -337,7 +341,13 @@ mod trace_impls {
             tracer.add_target(contents);
         }
     }
-    impl<T: Trace + ?Sized> Trace for std::rc::Weak<T> {}
+    impl<T: Trace + ?Sized> Trace for std::rc::Weak<T> {
+        /// Noop
+        #[inline]
+        fn trace(&self, _: &mut Tracer) {
+            // noop
+        }
+    }
     impl<T: Trace + ?Sized> Trace for std::sync::Arc<T> {
         /// Traces inner object (via deref)
         fn trace(&self, tracer: &mut Tracer) {
@@ -345,7 +355,13 @@ mod trace_impls {
             tracer.add_target(contents);
         }
     }
-    impl<T: Trace + ?Sized> Trace for std::sync::Weak<T> {}
+    impl<T: Trace + ?Sized> Trace for std::sync::Weak<T> {
+        /// Noop
+        #[inline]
+        fn trace(&self, _: &mut Tracer) {
+            // noop
+        }
+    }
     impl<T: Trace + ?Sized> Trace for std::cell::RefCell<T> {
         /// Borrows (Via `RefCell::borrow`) self and traces inner object
         fn trace(&self, tracer: &mut Tracer) {
@@ -408,10 +424,35 @@ mod trace_impls {
             }
         }
     }
-    impl<T, U> Trace for std::io::Chain<T, U> {}
-    impl<T> Trace for std::io::Cursor<T> {}
-    impl<T> Trace for std::io::Take<T> {}
-    impl<T> Trace for std::num::Wrapping<T> {}
+    impl<T, U> Trace for std::io::Chain<T, U> {
+        /// Noop
+        #[inline]
+        fn trace(&self, _: &mut Tracer) {
+            // noop
+        }
+    }
+    impl<T> Trace for std::io::Cursor<T> {
+        /// Noop
+        #[inline]
+        fn trace(&self, _: &mut Tracer) {
+            // noop
+        }
+    }
+    impl<T> Trace for std::io::Take<T> {
+        /// Noop
+        #[inline]
+        fn trace(&self, _: &mut Tracer) {
+            // noop
+        }
+    }
+    impl<T> Trace for std::num::Wrapping<T> {
+        /// Noop
+        #[inline]
+        fn trace(&self, _: &mut Tracer) {
+            // noop
+        }
+    }
+
 
     // Things chosen not to implement
     // std::sync::Mutex - Not sure what behavior I want

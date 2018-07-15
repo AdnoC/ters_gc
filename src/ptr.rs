@@ -629,9 +629,12 @@ impl<'a, T: 'a + ?Sized> Drop for Gc<'a, T> {
     /// # Examples
     ///
     /// ```
-    /// use ters_gc::{Collector, Gc};
-    /// use ters_gc::trace::{Trace};
+    /// extern crate ters_gc;
+    /// #[macro_use] extern crate ters_gc_derive;
     ///
+    /// use ters_gc::{Collector, Gc};
+    ///
+    /// #[derive(Trace)]
     /// struct Foo;
     ///
     /// impl Drop for Foo {
@@ -639,8 +642,6 @@ impl<'a, T: 'a + ?Sized> Drop for Gc<'a, T> {
     ///         println!("dropped!");
     ///     }
     /// }
-    ///
-    /// impl Trace for Foo { }
     ///
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
@@ -1044,10 +1045,16 @@ mod tests {
 
     #[test]
     fn casting_weak() {
-        use trace::Trace;
+        use trace::{Trace, Tracer};
 
         struct NoTrace<T>(pub T);
-        impl<T> Trace for NoTrace<T> {}
+        impl<T> Trace for NoTrace<T> {
+            /// Noop
+            #[inline]
+            fn trace(&self, _: &mut Tracer) {
+                // noop
+            }
+        }
 
         let mut col = Collector::new();
         let mut proxy = col.proxy();
