@@ -2,6 +2,9 @@
 name = "ters_gc_derive"
 version = "0.1.0"
 authors = ["AdnoC <adam.r.cutler@gmail.com>"]
+# repository = <PUT HERE ONCE ON GITHUM>
+license = "MIT OR Apache-2.0"
+description = "Custom derive support for ters_gc"
 
 [lib]
 proc-macro = true
