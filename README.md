@@ -71,7 +71,7 @@ fn main() {
 
 # Limitations
 
-## You cannot dereference a `Gc` inside of a
+## You cannot dereference a `Gc` inside of a \
 [`Drop`](https://doc.rust-lang.org/std/ops/trait.Drop.html) implementation
 
 Dereferencing a `Gc` inside of an object's destructor may result in a panic.
