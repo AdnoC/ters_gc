@@ -10,19 +10,15 @@
 //! An example of use with a cyclic data structure:
 //!
 //! ```
+//! extern crate ters_gc;
+//! #[macro_use] extern crate ters_gc_derive;
+//!
 //! use ters_gc::{Collector, Gc, trace};
 //! use std::cell::RefCell;
 //!
 //! // A struct that can hold references to itself
+//! #[derive(Trace)]
 //! struct CyclicStruct<'a>(RefCell<Option<Gc<'a, CyclicStruct<'a>>>>);
-//!
-//! // All things in the gc heap need to impl `Trace`
-//! impl<'a> trace::Trace for CyclicStruct<'a> {
-//!     fn trace(&self, tracer: &mut trace::Tracer) {
-//!         // Tell the tracer where to find our gc pointer
-//!         tracer.add_target(&self.0);
-//!     }
-//! }
 //!
 //! // Make a new collector to keep the gc state
 //! let mut col = Collector::new();
@@ -70,7 +66,11 @@
 //! tells the collector where in your struct it can find pointers to other
 //! things stored in the gc heap.
 //!
+//! To make it easy, you can `#[derive(Trace)]`.
+//!
 //! [`Trace`] is implemented for many of the types in `std`.
+//!
+//! Check the [`trace module`] documentation for more information.
 //!
 //! # Soundness (A.K.A. Is this safe?)
 //!
@@ -184,6 +184,7 @@
 //! [`Weak`]: ptr/struct.Weak.html
 //! [`Safe`]: ptr/struct.Safe.html
 //! [`Trace`]: trace/trait.Trace.html
+//! [`trace module`]: trace/index.html
 //! [`Tracer`]: trace/struct.Tracer.html
 //! [`Proxy::run`]: struct.Proxy.html#method.run
 //! [`Gc::is_alive`]: ptr/struct.Gc.html#method.is_alive

@@ -13,7 +13,9 @@
 //!
 //! # Examples
 //!
-//! A impl for a large, complex struct:
+//!
+//!
+//! Implementing manually for a large, complex struct:
 //!
 //! ```
 //! use ters_gc::{Collector, Proxy};
@@ -140,6 +142,7 @@ pub trait Trace {
     /// Tell the tracer about [`Gc`] pointers
     ///
     /// [`Gc`]: ../ptr/struct.Gc.html
+    #[inline]
     fn trace(&self, _tracer: &mut Tracer) {
         // noop
     }
