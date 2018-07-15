@@ -2,14 +2,45 @@
 //!
 //! A type must implement [`Trace`] to be stored in the gc heap.
 //!
-//! [`Trace`] is implemented for most standard library types.
-//!
 //! [`Trace`] lets the collector know what tracked objects an object has
 //! references to. An incomplete [`Trace`] implementation will result in
 //! memory leaks.
 //!
 //! A correct [`Trace`] implementation calls [`Tracer::add_target`] on all members
 //! that can contain a [`Gc`].
+//!
+//! # Standard Library Types
+//!
+//! [`Trace`] is implemented for most standard library types.
+//!
+//! ## Types of Note
+//!
+//! * [`RefCell`]
+//!
+//! Do not run collection while holding a mutable reference to the contents of
+//! a [`RefCell`] in the gc heap.
+//!
+//! Tracing requires an immutable borrow of the contents. This will cause a panic
+//! if collection occurs while you hold a mutable reference to the contents.
+//!
+//! ## Types not Implemented
+//!
+//! * [`Cell`]
+//!
+//! Cell prevents you from taking a reference to its contents. This means that
+//! we cannot trace the contents of a [`Cell`].
+//!
+//! * [`Mutex`]
+//!
+//! Would deadlock if collection was triggered while the [`Mutex`] was locked.
+//!
+//! * [`RwLock`]
+//!
+//! Same as above
+//!
+//! * Iterator Structs
+//!
+//! Too many types to implement for them all (but would be a noop implementation).
 //!
 //! # Examples
 //!
@@ -72,7 +103,7 @@
 //! });
 //! ```
 //!
-//! # Excluding fields when deriving
+//! ## Excluding fields when deriving
 //!
 //! When deriving [`Trace`], all fields of the struct/enum must also implement
 //! [`Trace`]. You can manually mark fields as non-targets of a trace with
@@ -91,14 +122,10 @@
 //! struct DoesTrace<'a> {
 //!     #[ignore_trace]
 //!     ignore1: NoTrace,
-//!
-//!     thing_to_trace: Option<Gc<'a, fn(i32, i32) -> i64>>,
-//!
 //!     #[ignore_trace]
 //!     ignore2: NoTrace,
-//!
+//!     thing_to_trace: Option<Gc<'a, fn(i32, i32) -> i64>>,
 //!     doesnt_matter: bool,
-//!
 //!     also_trace_this: Vec<Gc<'a, DoesTrace<'a>>>,
 //! }
 //! 
@@ -122,6 +149,10 @@
 //! [`Trace`]: trait.Trace.html
 //! [`Tracer::add_target`]: struct.Tracer.html#method.add_target
 //! [`Gc`]: ../ptr/struct.Gc.html
+//! [`RefCell`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html
+//! [`Cell`]: https://doc.rust-lang.org/std/cell/struct.Cell.html
+//! [`Mutex`]: https://doc.rust-lang.org/std/sync/struct.Mutex.html
+//! [`RwLock`]: https://doc.rust-lang.org/std/sync/struct.RwLock.html
 
 use ptr::{Gc, GcBox, Weak};
 use std::ptr::NonNull;
