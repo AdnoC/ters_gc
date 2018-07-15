@@ -25,13 +25,13 @@ fn derive_trace_compiles() {
     let mut proxy = col.proxy();
 
     {
-        let num = proxy.store(5);
-        let _cust_i32 = proxy.store(GcI32((), (), num.clone(), (), ()));
-        let _cust_newtype = proxy.store(GcNewType(num.clone()));
+        let num = proxy.alloc(5);
+        let _cust_i32 = proxy.alloc(GcI32((), (), num.clone(), (), ()));
+        let _cust_newtype = proxy.alloc(GcNewType(num.clone()));
 
-        let _cust_with_no_trace = proxy.store(GcWithNoTrace(num.clone(), NoTrace));
+        let _cust_with_no_trace = proxy.alloc(GcWithNoTrace(num.clone(), NoTrace));
 
-        let _cust_empty = proxy.store(GcEmpty);
+        let _cust_empty = proxy.alloc(GcEmpty);
     }
 
     proxy.run();

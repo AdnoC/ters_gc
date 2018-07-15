@@ -6,7 +6,7 @@ use std::thread;
 fn gc_not_send() {
     let mut col = Collector::new();
     let mut proxy = col.proxy();
-    let num = proxy.store(5);
+    let num = proxy.alloc(5);
     thread::spawn(move || { //~ ERROR Send` is not satisfied
                             //~^ ERROR Send` is not satisfied
                             //~| cannot be sent between threads safely
@@ -17,7 +17,7 @@ fn gc_not_send() {
 fn weak_not_send() {
     let mut col = Collector::new();
     let mut proxy = col.proxy();
-    let num = proxy.store(5);
+    let num = proxy.alloc(5);
     let num = Gc::downgrade(&num);
     thread::spawn(move || { //~ ERROR Send` is not satisfied
                             //~^ ERROR Send` is not satisfied
@@ -30,7 +30,7 @@ fn weak_not_send() {
 fn gc_not_sync() {
     let mut col = Collector::new();
     let mut proxy = col.proxy();
-    let num = proxy.store(5);
+    let num = proxy.alloc(5);
     let num_ref = &num;
     thread::spawn(move || { //~ ERROR cannot be shared between threads safely
                             //~^ ERROR cannot be shared between threads safely
@@ -42,7 +42,7 @@ fn gc_not_sync() {
 fn weak_not_sync() {
     let mut col = Collector::new();
     let mut proxy = col.proxy();
-    let num = proxy.store(5);
+    let num = proxy.alloc(5);
     let num = Gc::downgrade(&num);
     let num_ref = &num;
     thread::spawn(move || { //~ ERROR cannot be shared between threads safely

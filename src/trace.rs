@@ -61,12 +61,12 @@
 //! let mut col = Collector::new();
 //! let mut proxy = col.proxy();
 //!
-//! let tail = proxy.store(LinkedList {
+//! let tail = proxy.alloc(LinkedList {
 //!     next: None,
 //!     data: 0
 //! });
 //!
-//! let head = proxy.store(LinkedList {
+//! let head = proxy.alloc(LinkedList {
 //!     next: Some(tail),
 //!     data: 0
 //! });
@@ -92,12 +92,12 @@
 //! let mut col = Collector::new();
 //! let mut proxy = col.proxy();
 //!
-//! let tail = proxy.store(LinkedList {
+//! let tail = proxy.alloc(LinkedList {
 //!     next: None,
 //!     data: 0
 //! });
 //!
-//! let head = proxy.store(LinkedList {
+//! let head = proxy.alloc(LinkedList {
 //!     next: Some(tail),
 //!     data: 0
 //! });
@@ -133,7 +133,7 @@
 //! let mut col = Collector::new();
 //! let mut proxy = col.proxy();
 //!
-//! proxy.store(DoesTrace {
+//! proxy.alloc(DoesTrace {
 //!     ignore1: NoTrace,
 //!     thing_to_trace: None,
 //!     ignore2: NoTrace,

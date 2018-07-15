@@ -28,7 +28,7 @@ impl<'a> Graph<'a> {
             adjacencies: RefCell::new(Vec::new()),
             name,
         };
-        let node = proxy.store(node);
+        let node = proxy.alloc(node);
         self.nodes.push(node.clone());
         node
     }
@@ -117,7 +117,7 @@ struct Node<'a> {
 
 impl<'a> Node<'a> {
     fn connect_to(&self, proxy: &mut Proxy<'a>, dest: GcNode<'a>, weight: u32) {
-        let edge = proxy.store(Edge { dest, weight });
+        let edge = proxy.alloc(Edge { dest, weight });
         self.adjacencies.borrow_mut().push(edge);
     }
 

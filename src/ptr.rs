@@ -199,7 +199,7 @@ impl<'a, T: 'a + ?Sized> Clone for GcRef<'a, T> {
 /// in the cycle are unreachable they will be reclaimed the next time the
 /// collector is run.
 ///
-/// The typical way of obtaining a `Gc` pointer is to call [`Proxy::store`].
+/// The typical way of obtaining a `Gc` pointer is to call [`Proxy::alloc`].
 ///
 /// # Examples
 ///
@@ -211,10 +211,10 @@ impl<'a, T: 'a + ?Sized> Clone for GcRef<'a, T> {
 /// let mut col = Collector::new();
 /// let mut proxy = col.proxy();
 ///
-/// let _gc_ptr = proxy.store(0);
+/// let _gc_ptr = proxy.alloc(0);
 /// ```
 ///
-/// [`Proxy::store`]: ../struct.Proxy.html#method.store
+/// [`Proxy::alloc`]: ../struct.Proxy.html#method.alloc
 /// [`Gc`]: struct.Gc.html
 /// [get]: #method.get
 /// [is_alive]: #method.is_alive
@@ -247,7 +247,7 @@ impl<'a, T: 'a> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let zambia_2016_gdp = proxy.store(19_550_000_000); // USD
+    /// let zambia_2016_gdp = proxy.alloc(19_550_000_000); // USD
     ///
     /// let gdp_clone = zambia_2016_gdp.clone();
     ///
@@ -310,7 +310,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let meaning_of_life = proxy.store(42);
+    /// let meaning_of_life = proxy.alloc(42);
     ///
     /// assert!(Gc::is_alive(&meaning_of_life));
     /// ```
@@ -334,7 +334,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let dk_high_score = proxy.store(1_247_700);
+    /// let dk_high_score = proxy.alloc(1_247_700);
     ///
     /// let score_ref = Gc::get(&dk_high_score).unwrap();
     ///
@@ -368,7 +368,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let mut gpa = proxy.store(2.4);
+    /// let mut gpa = proxy.alloc(2.4);
     ///
     /// *Gc::get_mut(&mut gpa).unwrap() = 4.0;
     ///
@@ -446,7 +446,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let mariana_depth = proxy.store(10_994); // meters
+    /// let mariana_depth = proxy.alloc(10_994); // meters
     ///
     /// let weak_depth = Gc::downgrade(&mariana_depth);
     /// ```
@@ -476,7 +476,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let months = proxy.store(12);
+    /// let months = proxy.alloc(12);
     /// let also_months = months.clone();
     ///
     /// assert_eq!(Gc::strong_count(&months), 2);
@@ -502,7 +502,7 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let days_in_year = proxy.store(365);
+    /// let days_in_year = proxy.alloc(365);
     /// let _weak_days = Gc::downgrade(&days_in_year);
     ///
     /// assert_eq!(Gc::weak_count(&days_in_year), 1);
@@ -525,9 +525,9 @@ impl<'a, T: 'a + ?Sized> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let nes_sales = proxy.store(61_910_000);
+    /// let nes_sales = proxy.alloc(61_910_000);
     /// let same_nes_sales = nes_sales.clone();
-    /// let famicom_sales = proxy.store(61_910_000);
+    /// let famicom_sales = proxy.alloc(61_910_000);
     ///
     /// assert!(Gc::ptr_eq(&nes_sales, &same_nes_sales));
     /// assert!(!Gc::ptr_eq(&nes_sales, &famicom_sales));
@@ -581,7 +581,7 @@ impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let mut num_us_states = proxy.store(50);
+    /// let mut num_us_states = proxy.alloc(50);
     ///
     /// let mut num_without_hawaii = num_us_states.clone();
     /// *Gc::make_mut(&mut num_without_hawaii, &mut proxy) = 49;
@@ -606,7 +606,7 @@ impl<'a, T: 'a + Clone + Trace> Gc<'a, T> {
             // TODO Split case in 2 if I split data's destructure with GcBox's
             if Gc::strong_count(this) != 1 || Gc::weak_count(this) != 0 {
                 // Clone the data into a new Gc
-                *this = proxy.store((**this).clone());
+                *this = proxy.alloc((**this).clone());
             }
 
             // At this point this `Gc` is garunteed to be the sole strong
@@ -646,7 +646,7 @@ impl<'a, T: 'a + ?Sized> Drop for Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let foo = proxy.store(Foo);
+    /// let foo = proxy.alloc(Foo);
     /// let foo2 = foo.clone();
     ///
     /// drop(foo);
@@ -692,7 +692,7 @@ impl<'a, T: 'a> Clone for Gc<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let five = proxy.store(5);
+    /// let five = proxy.alloc(5);
     /// five.clone();
     /// ```
     ///
@@ -841,7 +841,7 @@ impl<'a, T: 'a + ?Sized> Weak<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let hd = proxy.store(1080);
+    /// let hd = proxy.alloc(1080);
     ///
     /// let weak_hd = Gc::downgrade(&hd);
     ///
@@ -870,7 +870,7 @@ impl<'a, T: 'a + ?Sized> Weak<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let everest_height = proxy.store(8_848); // meters
+    /// let everest_height = proxy.alloc(8_848); // meters
     ///
     /// let weak_height = Gc::downgrade(&everest_height);
     ///
@@ -939,7 +939,7 @@ impl<'a, T: 'a> Clone for Weak<'a, T> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let weak_five = Gc::downgrade(&proxy.store(5));
+    /// let weak_five = Gc::downgrade(&proxy.alloc(5));
     ///
     /// weak_five.clone();
     /// ```
@@ -1035,7 +1035,7 @@ mod tests {
         fn get_ref_num<'a, T>(gc: &Gc<'a, T>) -> usize {
             Gc::gc_box(gc).refs.clone().take()
         }
-        let num = proxy.store(42);
+        let num = proxy.alloc(42);
         assert_eq!(get_ref_num(&num), 1);
         let num2 = num.clone();
         assert_eq!(get_ref_num(&num), 2);
@@ -1058,7 +1058,7 @@ mod tests {
 
         let mut col = Collector::new();
         let mut proxy = col.proxy();
-        let num = proxy.store(NoTrace(Cell::new(0)));
+        let num = proxy.alloc(NoTrace(Cell::new(0)));
         let num_weak = Gc::downgrade(&num);
         {
             let num_ref = num_weak.upgrade().unwrap();
@@ -1073,7 +1073,7 @@ mod tests {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
         let num_weak = {
-            let num = proxy.store(0);
+            let num = proxy.alloc(0);
             let num_weak = Gc::downgrade(&num);
             num_weak
         };
@@ -1087,7 +1087,7 @@ mod tests {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
         let num_safe = {
-            let num = proxy.store(0);
+            let num = proxy.alloc(0);
             Gc::gc_box(&num).decr_ref();
             num
         };
@@ -1102,7 +1102,7 @@ mod tests {
     fn panic_when_deref_dangling_safe() {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
-        let num = proxy.store(0);
+        let num = proxy.alloc(0);
         Gc::gc_box(&num).decr_ref();
 
         proxy.run();
@@ -1196,10 +1196,10 @@ mod tests {
             s.finish()
         }
         fn requires_eq<E: Eq>(_e: &E) {}
-        let one = proxy.store(1);
-        let other_one = proxy.store(1);
-        let two = proxy.store(2);
-        let other_two = proxy.store(2);
+        let one = proxy.alloc(1);
+        let other_one = proxy.alloc(1);
+        let two = proxy.alloc(2);
+        let other_two = proxy.alloc(2);
 
         // Deref
         assert_eq!(1, *one);
@@ -1247,10 +1247,10 @@ mod tests {
         let mut proxy = col.proxy();
 
         fn requires_eq<E: Eq>(_e: &E) {}
-        let one = proxy.store(1);
-        let other_one = proxy.store(1);
-        let two = proxy.store(2);
-        let other_two = proxy.store(2);
+        let one = proxy.alloc(1);
+        let other_one = proxy.alloc(1);
+        let two = proxy.alloc(2);
+        let other_two = proxy.alloc(2);
 
         let one = Gc::downgrade(&one);
         let other_one = Gc::downgrade(&other_one);
@@ -1287,9 +1287,9 @@ mod tests {
     fn gc_ptr_eq() {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
-        let num = proxy.store(0);
+        let num = proxy.alloc(0);
         let num_cl = num.clone();
-        let other_num = proxy.store(0);
+        let other_num = proxy.alloc(0);
 
         assert!(Gc::ptr_eq(&num, &num_cl));
         assert!(!Gc::ptr_eq(&num, &other_num));
@@ -1301,7 +1301,7 @@ mod tests {
         use std::mem::drop;
         let mut col = Collector::new();
         let mut proxy = col.proxy();
-        let mut num = proxy.store(0);
+        let mut num = proxy.alloc(0);
         assert!(Gc::get_mut(&mut num).is_some());
 
         let num_cl = num.clone();
@@ -1319,13 +1319,13 @@ mod tests {
     fn make_mut_when_lone() {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
-        let mut num = proxy.store(0);
+        let mut num = proxy.alloc(0);
         assert_eq!(0, *num);
         {
             let num_ref = Gc::make_mut(&mut num, &mut proxy);
             {
                 // Checking that the mut ref doesn't take proxy's lifetime
-                let _ = proxy.store(0);
+                let _ = proxy.alloc(0);
             }
             *num_ref = 42;
         }
@@ -1337,7 +1337,7 @@ mod tests {
         use std::mem::drop;
         let mut col = Collector::new();
         let mut proxy = col.proxy();
-        let mut num = proxy.store(0);
+        let mut num = proxy.alloc(0);
         let num_cl = num.clone();
         {
             let num_ref = Gc::make_mut(&mut num, &mut proxy);
@@ -1362,12 +1362,12 @@ mod tests {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
 
-        let num = proxy.store(42);
+        let num = proxy.alloc(42);
         let removed_num = Gc::try_unwrap(num, &mut proxy);
         let ok_num = removed_num.unwrap();
         assert_eq!(42, ok_num);
 
-        let num = proxy.store(42);
+        let num = proxy.alloc(42);
         let weak_1 = Gc::downgrade(&num);
         let weak_2 = Gc::downgrade(&num);
         let weak_3 = Gc::downgrade(&num);
@@ -1388,7 +1388,7 @@ mod tests {
     fn unwrap_err_when_multiple_refs() {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
-        let num = proxy.store(42);
+        let num = proxy.alloc(42);
         let num_cl = num.clone();
         let err_num = Gc::try_unwrap(num, &mut proxy);
         assert!(err_num.is_err());
@@ -1419,7 +1419,7 @@ mod tests {
     // // }
     //         let mut col = Collector::new();
     //         let mut _proxy = col.proxy();
-    //         // let stored_gc: Gc<ToString>  = proxy.store(val);
+    //         // let stored_gc: Gc<ToString>  = proxy.alloc(val);
     //         // let r: GcRef<Trace> = GcRef {
     //         //     _marker: PhantomData,
     //         //     ptr: unimplemented!()

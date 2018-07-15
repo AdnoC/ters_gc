@@ -25,8 +25,8 @@ fn main() {
 
     // Do some computations that are best expressed with a cyclic data structure
     {
-        let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
-        let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+        let thing1 = proxy.alloc(CyclicStruct(RefCell::new(None)));
+        let thing2 = proxy.alloc(CyclicStruct(RefCell::new(Some(thing1.clone()))));
         *thing1.0.borrow_mut() = Some(thing2.clone());
     } // They are out of scope and no longer reachable here
 

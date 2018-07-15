@@ -28,8 +28,8 @@
 //!
 //! // Do some computations that are best expressed with a cyclic data structure
 //! {
-//!     let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
-//!     let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+//!     let thing1 = proxy.alloc(CyclicStruct(RefCell::new(None)));
+//!     let thing2 = proxy.alloc(CyclicStruct(RefCell::new(Some(thing1.clone()))));
 //!     *thing1.0.borrow_mut() = Some(thing2.clone());
 //! }
 //!
@@ -502,12 +502,12 @@ impl<'a> Proxy<'a> {
     /// let mut col = Collector::new();
     /// let mut proxy = col.proxy();
     ///
-    /// let val = proxy.store(42);
+    /// let val = proxy.alloc(42);
     /// assert_eq!(*val, 42);
     /// ```
     ///
     /// [`paused`]: #method.paused
-    pub fn store<T: Trace>(&mut self, payload: T) -> Gc<'a, T> {
+    pub fn alloc<T: Trace>(&mut self, payload: T) -> Gc<'a, T> {
         let ptr = self.collector.alloc(payload);
         Gc::from_raw_nonnull(ptr, PhantomData)
     }
@@ -523,7 +523,7 @@ impl<'a> Proxy<'a> {
     /// let mut proxy = col.proxy();
     ///
     /// {
-    ///     proxy.store(42);
+    ///     proxy.alloc(42);
     /// }
     /// assert_eq!(proxy.num_tracked(), 1);
     /// proxy.run();
@@ -612,10 +612,10 @@ impl<'a> Proxy<'a> {
     ///
     /// assert_eq!(proxy.num_tracked(), 0);
     ///
-    /// let _ = proxy.store(());
+    /// let _ = proxy.alloc(());
     /// assert_eq!(proxy.num_tracked(), 1);
     ///
-    /// let _ = proxy.store(());
+    /// let _ = proxy.alloc(());
     /// assert_eq!(proxy.num_tracked(), 2);
     /// ```
     pub fn num_tracked(&self) -> usize {
@@ -661,7 +661,7 @@ impl<'a> Proxy<'a> {
     /// let init_thresh = proxy.threshold();
     ///
     /// for _ in 0..(init_thresh + 1) {
-    ///     proxy.store(());
+    ///     proxy.alloc(());
     /// }
     ///
     /// let new_thresh = proxy.threshold();
@@ -704,10 +704,10 @@ mod tests {
         let mut proxy = col.proxy();
 
         for i in 0..60 {
-            let num = proxy.store(i);
+            let num = proxy.alloc(i);
             assert_eq!(*num, i);
         }
-        let num = proxy.store(-1);
+        let num = proxy.alloc(-1);
         assert_eq!(*num, -1);
         assert!(proxy.num_tracked() > 0);
         proxy.run();
@@ -722,7 +722,7 @@ mod tests {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
         {
-            let _num1 = proxy.store(42);
+            let _num1 = proxy.alloc(42);
             assert_eq!(num_tracked_objs(&proxy), 1);
             proxy.run();
             assert_eq!(num_tracked_objs(&proxy), 1);
@@ -744,7 +744,7 @@ mod tests {
         let mut head = LinkedList { next: None };
         macro_rules! prepend_ll {
             () => {{
-                let boxed = proxy.store(head);
+                let boxed = proxy.alloc(head);
                 LinkedList { next: Some(boxed) }
             }};
         }
@@ -753,7 +753,7 @@ mod tests {
         }
         {
             for _ in 0..num_wasted {
-                proxy.store(22);
+                proxy.alloc(22);
             }
         }
         assert_eq!(num_tracked_objs(&proxy), threshold);
@@ -775,7 +775,7 @@ mod tests {
         let mut head = LinkedList { next: None };
         macro_rules! prepend_ll {
             () => {{
-                let boxed = proxy.store(head);
+                let boxed = proxy.alloc(head);
                 LinkedList { next: Some(boxed) }
             }};
         }
@@ -784,7 +784,7 @@ mod tests {
         }
         {
             for _ in 0..num_wasted {
-                proxy.store(22);
+                proxy.alloc(22);
             }
         }
         assert_eq!(num_tracked_objs(&proxy), threshold);
@@ -805,7 +805,7 @@ mod tests {
         let mut head = LinkedList { next: None };
         macro_rules! prepend_ll {
             () => {{
-                let boxed = proxy.store(head);
+                let boxed = proxy.alloc(head);
                 LinkedList { next: Some(boxed) }
             }};
         }
@@ -813,7 +813,7 @@ mod tests {
             head = prepend_ll!(); //(&mut proxy, head);
         }
         for _ in 0..num_wasted {
-            proxy.store(22);
+            proxy.alloc(22);
         }
         assert_eq!(num_tracked_objs(&proxy), threshold);
         proxy.pause();
@@ -836,7 +836,7 @@ mod tests {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
         {
-            let ptr = proxy.store(SelfRef {
+            let ptr = proxy.alloc(SelfRef {
                 self_ptr: RefCell::new(None),
             });
             *ptr.self_ptr.borrow_mut() = Some(ptr.clone());
@@ -861,8 +861,8 @@ mod tests {
         let mut col = Collector::new();
         let mut proxy = col.proxy();
         let _root = {
-            let leaf = proxy.store(List { ptr: None });
-            let root = proxy.store(List { ptr: Some(leaf) });
+            let leaf = proxy.alloc(List { ptr: None });
+            let root = proxy.alloc(List { ptr: Some(leaf) });
             Box::new(root)
         };
 
@@ -894,8 +894,8 @@ mod tests {
 
         // Do some computations that are best expressed with a cyclic data structure
         {
-            let thing1 = proxy.store(CyclicStruct(RefCell::new(None)));
-            let thing2 = proxy.store(CyclicStruct(RefCell::new(Some(thing1.clone()))));
+            let thing1 = proxy.alloc(CyclicStruct(RefCell::new(None)));
+            let thing2 = proxy.alloc(CyclicStruct(RefCell::new(Some(thing1.clone()))));
             *thing1.0.borrow_mut() = Some(thing2.clone());
         }
 
@@ -920,7 +920,7 @@ mod tests {
         let mut head = LinkedList { next: None };
         macro_rules! prepend_ll {
             () => {{
-                let boxed = proxy.store(head);
+                let boxed = proxy.alloc(head);
                 LinkedList { next: Some(boxed) }
             }};
         }
@@ -928,7 +928,7 @@ mod tests {
             head = prepend_ll!(); //(&mut proxy, head);
         }
         for _ in 0..num_wasted {
-            proxy.store(22);
+            proxy.alloc(22);
         }
         assert_eq!(proxy.num_tracked(), threshold);
         head = prepend_ll!(); //(&mut proxy, head);
