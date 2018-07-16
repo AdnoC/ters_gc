@@ -2,7 +2,7 @@
 //!
 //! ("tiny" is deliberately misspelled for the sake of the acronym)
 //!
-//! A mark-and-sweep garbage collecting allocator.
+//! A toy mark-and-sweep garbage collecting allocator.
 //! Based loosely on orangeduck's [`Tiny Garbage Collector`].
 //!
 //! Provides the [`Gc`] type, essentially an [`Rc`] that can handle cycles.

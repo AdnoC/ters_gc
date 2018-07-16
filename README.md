@@ -8,7 +8,7 @@ A tinee Rust garbage collector (ters gc)
 [![Latest version](https://img.shields.io/crates/v/ters_gc.svg)](https://crates.io/crates/ters_gc)
 [![Documentation](https://docs.rs/ters_gc/badge.svg)](https://docs.rs/ters_gc)
 
-A mark-and-sweep garbage collecting allocator.
+A toy mark-and-sweep garbage collecting allocator.
 Based loosely on orangeduck's
 [`Tiny Garbage Collector`](https://github.com/orangeduck/tgc).
 
