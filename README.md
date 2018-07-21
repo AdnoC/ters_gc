@@ -5,15 +5,14 @@ A tinee Rust garbage collector (ters gc)
 
 ("tiny" is deliberately misspelled for the sake of the acronym)
 
-[![Latest version](https://img.shields.io/crates/v/ters_gc.svg)](https://crates.io/crates/ters_gc)
-[![Documentation](https://docs.rs/ters_gc/badge.svg)](https://docs.rs/ters_gc)
-
 A toy mark-and-sweep garbage collecting allocator.
 Based loosely on orangeduck's
 [`Tiny Garbage Collector`](https://github.com/orangeduck/tgc).
 
 Provides the `Gc` type, essentially an [`Rc`](https://doc.rust-lang.org/std/rc/struct.Rc.html)
 that can handle cycles.
+
+Won't be published on crates.io, so you have to `cargo doc --open` if you want to read the docs in your browser.
 
 
 # Example
